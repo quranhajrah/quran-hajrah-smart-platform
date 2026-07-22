@@ -60,9 +60,11 @@
 
 ## Git وGitHub Actions
 
-- commit الإصدار: يُحدّث بعد إنشاء commit.
-- push إلى `origin/main`: قيد التنفيذ بعد اكتمال التقرير.
-- GitHub Actions: قيد الانتظار؛ لا تُعد المرحلة ناجحة على GitHub قبل اخضرار CI.
+- commit الإصدار: `3dba666deab8529603af38d5c6af4f9274c505ac` بعنوان `release: enterprise 21 production readiness`.
+- commit إصلاح CI: `40da159` بعنوان `ci: generate Prisma client before production typecheck`.
+- push إلى `origin/main`: ناجح لكلا الـcommitين.
+- تشغيل GitHub Actions النهائي للكود: `29892919802` — ناجح، بما في ذلك job `validate` وjob `production`.
+- المحاولة الأولى `29892735030`: نجح `validate` وفشل `production` في typecheck لأن Prisma Client لم يكن مولدًا بعد داخل job النظيفة. عولج السبب بجعل `typecheck` يولد العميل أولًا وإضافة خطوة توليد مبكرة إلى job الإنتاج، ثم نجحت الإعادة.
 
 ## التحقق الإنتاجي والنطاق
 
@@ -75,4 +77,4 @@
 ## حالة المرحلة
 
 **ناجح محليًا**.  
-ليست «ناجحة إنتاجيًا»: النطاق وقاعدة PostgreSQL الإنتاجية وCI النهائي لم تُتحقق بعد وقت كتابة النسخة الأولية من التقرير.
+ليست «ناجحة إنتاجيًا»: GitHub CI أخضر، لكن النطاق وقاعدة PostgreSQL الإنتاجية لم يُتحققا بعد.
