@@ -13,7 +13,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "security:check": "node tooling/check-sensitive-files.mjs",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build -w @quran-hajrah/database && npm run typecheck --workspaces --if-present",
     "db:generate": "npm run generate -w @quran-hajrah/database",
     "db:validate": "npm run validate -w @quran-hajrah/database",
     "db:migrate": "npm run migrate:dev -w @quran-hajrah/database",
