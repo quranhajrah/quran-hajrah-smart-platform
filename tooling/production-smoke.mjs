@@ -1,13 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 
-const port = 3399;
+const omitPort = process.env.SMOKE_OMIT_PORT === 'true';
+const port = omitPort ? 3000 : 3399;
 const secret = () => randomBytes(32).toString('hex');
 const child = spawn(process.execPath, ['apps/api/dist/server.js'], {
   env: {
     ...process.env,
     NODE_ENV: 'production',
-    PORT: String(port),
+    ...(!omitPort ? { PORT: String(port) } : {}),
     DATABASE_URL: 'postgresql://smoke@127.0.0.1:5432/smoke',
     DIRECT_URL: 'postgresql://smoke@127.0.0.1:5432/smoke',
     ADMIN_ORIGIN: `http://127.0.0.1:${port}`,

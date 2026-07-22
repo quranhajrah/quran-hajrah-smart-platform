@@ -27,10 +27,35 @@ afterEach(async () => {
 
 describe('production runtime', () => {
   it('fails startup when production secrets are missing', () => {
-    const names = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'SESSION_SECRET', 'DATABASE_URL', 'DIRECT_URL', 'ADMIN_ORIGIN', 'PORTAL_ORIGIN', 'CORS_ORIGINS', 'PORT'];
+    const names = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'SESSION_SECRET', 'DATABASE_URL', 'DIRECT_URL', 'ADMIN_ORIGIN', 'PORTAL_ORIGIN', 'CORS_ORIGINS'];
     for (const name of names) vi.stubEnv(name, '');
     vi.stubEnv('NODE_ENV', 'production');
     expect(() => loadConfig()).toThrow('JWT_ACCESS_SECRET is required.');
+  });
+
+  it('defaults to port 3000 when PORT is missing in production', () => {
+    const environment = {
+      NODE_ENV: 'production',
+      JWT_ACCESS_SECRET: 'test-only-access-secret-that-is-longer-than-32-characters',
+      JWT_REFRESH_SECRET: 'test-only-refresh-secret-that-is-longer-than-32-characters',
+      SESSION_SECRET: 'test-only-session-secret-that-is-longer-than-32-characters',
+      DATABASE_URL: 'postgresql://test:test@127.0.0.1:5432/test',
+      DIRECT_URL: 'postgresql://test:test@127.0.0.1:5432/test',
+      ADMIN_ORIGIN: 'https://app.example.test',
+      PORTAL_ORIGIN: 'https://app.example.test',
+      CORS_ORIGINS: 'https://app.example.test',
+      COOKIE_SECURE: 'true',
+      COOKIE_SAME_SITE: 'lax',
+      ACCESS_TOKEN_TTL: '15m',
+      REFRESH_TOKEN_TTL: '7d',
+      TRUST_PROXY: '1',
+      LOG_LEVEL: 'silent',
+      RATE_LIMIT_WINDOW_MS: '60000',
+      RATE_LIMIT_MAX: '300',
+    };
+    for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value);
+    vi.stubEnv('PORT', undefined);
+    expect(loadConfig().port).toBe(3000);
   });
 
   it('reports liveness without querying the database', async () => {

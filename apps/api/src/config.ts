@@ -97,7 +97,8 @@ export const loadConfig = (): AppConfig => {
   const trustProxy = parseTrustProxy(value('TRUST_PROXY', isProduction, 'false'));
   if (isProduction && trustProxy === false) throw new Error('TRUST_PROXY must be enabled in production.');
 
-  const port = positiveNumber('PORT', value('PORT', isProduction, '3000'));
+  const port = Number(process.env.PORT ?? 3000);
+  if (!Number.isFinite(port) || port <= 0) throw new Error('PORT must be a positive number.');
   if (!Number.isInteger(port) || port > 65_535) throw new Error('PORT must be an integer between 1 and 65535.');
   const accessTokenTtl = value('ACCESS_TOKEN_TTL', isProduction, '15m');
   durationMs('ACCESS_TOKEN_TTL', accessTokenTtl);

@@ -46,3 +46,5 @@ jobs:
       - name: Reinstall runtime dependencies only
         run: rm -rf node_modules && npm ci --omit=dev
       - run: npm run smoke:production
+        env:
+          SMOKE_OMIT_PORT: "true"

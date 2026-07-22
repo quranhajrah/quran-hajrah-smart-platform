@@ -20,6 +20,7 @@ console.log(JSON.stringify({
 
 const start = async () => {
   await import('dotenv/config');
+  const port = Number(process.env.PORT ?? 3000);
   const [databaseModule, appModule, configModule, lifecycleModule, loggerModule] = await Promise.all([
     import('@quran-hajrah/database'),
     import('./app.js'),
@@ -31,7 +32,7 @@ const start = async () => {
   const config = configModule.loadConfig();
   const logger = loggerModule.createLogger(config.logLevel);
   const app = appModule.createApp({ config, logger });
-  const server = app.listen(config.port, host);
+  const server = app.listen(port, host);
 
   server.once('listening', () => {
     console.log(JSON.stringify({
@@ -39,7 +40,7 @@ const start = async () => {
       time: new Date().toISOString(),
       event: 'server_started',
       host,
-      port: config.port,
+      port,
       environment: config.nodeEnv,
     }));
   });
