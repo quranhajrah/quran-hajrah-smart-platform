@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String         @id @default(uuid()) @db.Uuid
+  fullName        String
+  email           String         @unique
+  passwordHash    String
+  phone           String?
+  jobTitle        String?
+  isActive        Boolean        @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  roles           UserRole[]     @relation("UserRoles")
+  roleAssignments UserRole[]     @relation("AssignedBy")
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]
+
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  displayName String
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  displayName String
+  module      String
+  description String?
+  roles       RolePermission[]
+
+  @@index([module])
+}
+
+model UserRole {
+  userId         String   @db.Uuid
+  roleId         String   @db.Uuid
+  assignedAt     DateTime @default(now())
+  assignedBy     String?  @db.Uuid
+  user           User     @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
+  role           Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedByUser User?    @relation("AssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@index([assignedBy])
+}
+
+model RolePermission {
+  roleId      String     @db.Uuid
+  permissionId String    @db.Uuid
+  role        Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission  Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  ipAddress String?
+  userAgent String?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @db.Uuid
+  action      String
+  entityType  String?
+  entityId    String?
+  description String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

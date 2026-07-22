@@ -1,0 +1,96 @@
+# Authentication and RBAC
+
+## Architecture
+
+The identity system is split into HTTP routes, security primitives, and an `IdentityStore` abstraction. Production uses `PrismaIdentityStore` with PostgreSQL. API tests inject an isolated in-memory store, so tests never connect to or mutate production data. The admin application consumes only the real HTTP API and contains no fallback or sample records.
+
+Passwords are hashed with bcrypt. Access tokens are short-lived HS256 JWTs returned to the client and retained only in application memory. Refresh tokens are cryptographically random opaque values stored in a strict HttpOnly cookie; only a SHA-256 hash is persisted. Every refresh rotates and revokes the previous token.
+
+## Login flow
+
+1. The client submits email and password to `POST /api/auth/login`.
+2. The API applies a dedicated login rate limit and returns the same generic error for unknown email, wrong password, and inactive users.
+3. After verification, the API creates a refresh session, writes an audit entry, and returns a short-lived access token with the public user and effective permissions.
+4. The browser keeps the access token in memory and sends it as a Bearer token. It never writes the token to localStorage.
+5. When the application starts or the access token expires, `POST /api/auth/refresh` rotates the HttpOnly refresh cookie and returns a new access token.
+6. Logout revokes the session and clears the cookie. Password changes revoke every session belonging to the user.
+
+## Built-in roles
+
+| Code | Arabic display name |
+| --- | --- |
+| `super_admin` | مدير النظام العام |
+| `board_chair` | رئيس مجلس الإدارة |
+| `executive_director` | المدير التنفيذي |
+| `operations_manager` | مدير العمليات |
+| `finance_manager` | المدير المالي |
+| `education_manager` | مدير التعليم |
+| `governance_officer` | مسؤول الحوكمة |
+| `employee` | موظف |
+| `viewer` | مشاهد |
+
+System roles are seeded idempotently. Only `super_admin` receives all permissions. The viewer role receives `dashboard.view`; future module migrations may grant narrowly scoped permissions to other roles.
+
+## Initial permissions
+
+- Users: `users.view`, `users.create`, `users.update`, `users.disable`, `users.assign_roles`
+- Roles: `roles.view`, `roles.manage`
+- Platform: `dashboard.view`, `audit.view`, `settings.manage`
+
+Permissions are rows keyed by a stable dotted code and grouped by `module`, allowing future modules to add permission records without changing authorization middleware.
+
+## Environment variables
+
+Copy `.env.example` to `.env` and set values outside source control.
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection URL |
+| `JWT_ACCESS_SECRET` | Random signing secret of at least 32 characters |
+| `ACCESS_TOKEN_MINUTES` | Access-token lifetime; default 15 |
+| `REFRESH_TOKEN_DAYS` | Refresh-session lifetime; default 7 |
+| `REFRESH_COOKIE_NAME` | Refresh cookie name |
+| `BCRYPT_ROUNDS` | Bcrypt work factor; default 12 |
+| `CORS_ORIGINS` | Comma-separated allowed admin origins |
+| `VITE_API_URL` | Admin build-time API base URL |
+| `ADMIN_EMAIL` | Email used only by `create:admin` |
+| `ADMIN_FULL_NAME` | Name used only by `create:admin` |
+| `ADMIN_PASSWORD` | Password used only by `create:admin` |
+
+Do not commit `.env`, credentials, generated database dumps, or backup files.
+
+## Database and first administrator
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+npm run create:admin
+```
+
+`create:admin` fails unless all three administrator environment variables are present, the password passes policy, the system roles have been seeded, and the email does not already exist. There is no default password.
+
+## API authorization
+
+Routes first use `requireAuth`, then `requirePermission(code)` for a specific capability. `requireAnyPermission(...codes)` is available for routes that accept several capabilities. Zod schemas are strict, so unknown fields are rejected and cannot be mass-assigned.
+
+The final active super administrator cannot disable itself or lose its super-admin role. System role names and `isSystem` are never accepted from update payloads, and the `super_admin` permission set cannot be reduced.
+
+## Tests
+
+```bash
+npm run test
+```
+
+The test store is created fresh before every test and exists only in process memory. Tests cover valid and invalid login, inactive users, refresh rotation, logout revocation, authentication and permission denial, allowed access, user creation, hash omission, last-super-admin protection, and audit creation.
+
+## Security considerations
+
+- Helmet headers, strict CORS allowlist, global and login-specific rate limits.
+- 100 KB JSON body limit and strict Zod validation.
+- Generic authentication errors and active-user verification on every authenticated request.
+- HttpOnly, SameSite=Strict refresh cookie; Secure is enabled in production.
+- Refresh-token hashes and password hashes never appear in response DTOs.
+- No password or token logging is implemented.
+- Central error handling omits stack traces in production.
+- Audit records capture actor, request IP, user agent, entity, and action metadata.

@@ -1,0 +1,37 @@
+{
+  "name": "quran-hajrah-smart-platform",
+  "version": "20.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Quran Hajrah Smart Platform monorepo",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n admin,portal,api -c cyan,green,yellow \"npm run dev -w @quran-hajrah/admin\" \"npm run dev -w @quran-hajrah/portal\" \"npm run dev -w @quran-hajrah/api\"",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint apps packages --ext .js,.cjs,.ts,.tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "security:check": "node tooling/check-sensitive-files.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run generate -w @quran-hajrah/database",
+    "db:validate": "npm run validate -w @quran-hajrah/database",
+    "db:migrate": "npm run migrate:dev -w @quran-hajrah/database",
+    "db:studio": "npm run studio -w @quran-hajrah/database"
+    ,"db:seed": "npm run seed -w @quran-hajrah/database"
+    ,"create:admin": "npm run create:admin -w @quran-hajrah/database"
+  },
+  "engines": { "node": ">=20" },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1"
+  }
+}
