@@ -43,4 +43,6 @@ jobs:
       - run: npm run db:validate
       - run: npm run db:generate
       - run: npm run build:production
+      - name: Reinstall runtime dependencies only
+        run: rm -rf node_modules && npm ci --omit=dev
       - run: npm run smoke:production

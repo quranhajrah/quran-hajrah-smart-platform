@@ -29,11 +29,22 @@ const child = spawn(process.execPath, ['apps/api/dist/server.js'], {
 });
 
 let stderr = '';
+let stdout = '';
+child.stdout.on('data', (chunk) => { stdout = `${stdout}${chunk}`.slice(-8_000); });
 child.stderr.on('data', (chunk) => { stderr = `${stderr}${chunk}`.slice(-4_000); });
+
+const checkStaticAssets = async (baseUrl, html) => {
+  const assetPaths = [...html.matchAll(/(?:src|href)="([^"]*assets\/[^"]+)"/g)].map((match) => match[1]);
+  if (assetPaths.length === 0) throw new Error(`No hashed static assets were referenced by ${baseUrl}.`);
+  for (const assetPath of assetPaths) {
+    const asset = await fetch(new URL(assetPath, baseUrl));
+    if (asset.status !== 200) throw new Error(`Static asset ${assetPath} returned ${asset.status}.`);
+  }
+};
 
 try {
   let response;
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     try {
       response = await fetch(`http://127.0.0.1:${port}/health`);
       break;
@@ -41,7 +52,7 @@ try {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
-  if (!response || response.status !== 200) throw new Error(`Production health smoke failed. ${stderr}`);
+  if (!response || response.status !== 200) throw new Error(`Production health smoke failed. stdout=${stdout} stderr=${stderr}`);
   const body = await response.json();
   if (body.status !== 'ok') throw new Error('Production health returned an unexpected body.');
 
@@ -51,14 +62,18 @@ try {
   }
 
   const admin = await fetch(`http://127.0.0.1:${port}/login`, { redirect: 'manual' });
-  if (admin.status !== 200 || !(await admin.text()).includes('id="root"')) {
+  const adminHtml = await admin.text();
+  if (admin.status !== 200 || !adminHtml.includes('id="root"')) {
     throw new Error('Admin SPA fallback failed.');
   }
+  await checkStaticAssets(`http://127.0.0.1:${port}/login`, adminHtml);
 
   const portal = await fetch(`http://127.0.0.1:${port}/portal/`, { redirect: 'manual' });
-  if (portal.status !== 200 || !(await portal.text()).includes('id="root"')) {
+  const portalHtml = await portal.text();
+  if (portal.status !== 200 || !portalHtml.includes('id="root"')) {
     throw new Error(`Portal production entry failed with status ${portal.status} and location ${portal.headers.get('location') ?? 'none'}.`);
   }
+  await checkStaticAssets(`http://127.0.0.1:${port}/portal/`, portalHtml);
 
   const protectedRoute = await fetch(`http://127.0.0.1:${port}/api/users`);
   if (protectedRoute.status !== 401) throw new Error('Protected API route did not reject anonymous access.');
@@ -68,7 +83,12 @@ try {
     throw new Error('Unknown API route was intercepted by the SPA fallback.');
   }
 
-  console.log('Production start, health, readiness, SPAs, and protected-route smoke passed.');
+  if (!stdout.includes('"event":"startup_initializing"')) throw new Error('Immediate startup log was not written to stdout.');
+  if (!stdout.includes('"event":"server_started"') || !stdout.includes('"host":"0.0.0.0"')) {
+    throw new Error('Listening startup log did not confirm host 0.0.0.0.');
+  }
+
+  console.log('Production runtime, logs, health, readiness, SPAs, static assets, and protected route passed.');
 } finally {
   child.kill('SIGTERM');
 }
