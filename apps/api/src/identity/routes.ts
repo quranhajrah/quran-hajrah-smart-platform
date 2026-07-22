@@ -46,10 +46,11 @@ const paginationSchema = z.object({ page: z.coerce.number().int().min(1).default
 
 const cookieOptions = (config: AppConfig): CookieOptions => ({
   httpOnly: true,
-  secure: config.nodeEnv === 'production',
-  sameSite: 'strict',
+  secure: config.cookieSecure,
+  sameSite: config.cookieSameSite,
+  ...(config.cookieDomain ? { domain: config.cookieDomain } : {}),
   path: '/api/auth',
-  maxAge: config.refreshTokenDays * 24 * 60 * 60 * 1000,
+  maxAge: config.refreshTokenTtlMs,
 });
 const clearCookieOptions = (config: AppConfig): CookieOptions => {
   const options = cookieOptions(config);
@@ -66,8 +67,8 @@ export const createIdentityRouter = (store: IdentityStore, config: AppConfig) =>
     const refreshToken = createRefreshToken();
     await store.createSession({
       userId,
-      tokenHash: hashToken(refreshToken),
-      expiresAt: new Date(Date.now() + config.refreshTokenDays * 86_400_000),
+      tokenHash: hashToken(refreshToken, config.refreshTokenSecret),
+      expiresAt: new Date(Date.now() + config.refreshTokenTtlMs),
       revokedAt: null,
       ...context,
     });
@@ -89,7 +90,7 @@ export const createIdentityRouter = (store: IdentityStore, config: AppConfig) =>
   router.post('/auth/refresh', asyncRoute(async (request, response) => {
     const rawToken = request.cookies?.[config.cookieName] as string | undefined;
     if (!rawToken) throw new AppError(401, 'Authentication required.', 'INVALID_SESSION');
-    const session = await store.findSession(hashToken(rawToken));
+    const session = await store.findSession(hashToken(rawToken, config.refreshTokenSecret));
     if (!session || session.revokedAt || session.expiresAt <= new Date()) throw new AppError(401, 'Authentication required.', 'INVALID_SESSION');
     const user = await store.findUserById(session.userId);
     if (!user?.isActive) throw new AppError(401, 'Authentication required.', 'INVALID_SESSION');
@@ -102,7 +103,7 @@ export const createIdentityRouter = (store: IdentityStore, config: AppConfig) =>
   router.post('/auth/logout', asyncRoute(async (request, response) => {
     const rawToken = request.cookies?.[config.cookieName] as string | undefined;
     if (rawToken) {
-      const session = await store.findSession(hashToken(rawToken));
+      const session = await store.findSession(hashToken(rawToken, config.refreshTokenSecret));
       if (session) {
         await store.revokeSession(session.id);
         await store.createAudit({ userId: session.userId, action: 'auth.logout', description: 'User signed out.', ...request.context });

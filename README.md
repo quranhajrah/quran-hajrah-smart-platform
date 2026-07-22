@@ -2,6 +2,8 @@
 
 Clean TypeScript monorepo scaffold for the Quran Hajrah Smart Platform. It contains infrastructure and empty application shells only; business modules and product pages are intentionally not implemented yet.
 
+Current release: `21.0.0` — Enterprise 21 Production Readiness.
+
 ## Structure
 
 ```text
@@ -47,6 +49,27 @@ npm run build
 npm run security:check
 npm run db:validate
 ```
+
+## Production
+
+```bash
+npm run build:production
+npm run start:production
+```
+
+Production serves admin at `/`, portal at `/portal/`, API at `/api`, liveness at `/health`, and PostgreSQL readiness at `/ready`. Configure every required environment value from `.env.example`; the production process intentionally fails when essential values are absent.
+
+Database deployment commands:
+
+```bash
+npm run db:status
+npm run db:diagnostics
+npm run db:deploy
+npm run db:seed
+npm run create:admin
+```
+
+See `docs/production-architecture.md`, `docs/enterprise-21-production-readiness.md`, and `hostinger/README.md` before deployment.
 
 ## Identity and access management
 

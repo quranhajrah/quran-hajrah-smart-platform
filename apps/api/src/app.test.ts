@@ -8,7 +8,15 @@ import type { IdentityStore, UserQuery } from './identity/store.js';
 import type { AuditEntry, IdentityUser, PublicRole, RefreshSession } from './identity/types.js';
 
 const config: AppConfig = {
-  nodeEnv: 'test', corsOrigins: ['http://localhost:5173'], accessTokenSecret: 'test-only-secret-that-is-longer-than-32-characters', accessTokenMinutes: 15, refreshTokenDays: 7, cookieName: 'test_refresh', bcryptRounds: 4,
+  nodeEnv: 'production', isProduction: true, port: 3000,
+  adminOrigin: 'https://admin.example.test', portalOrigin: 'https://portal.example.test',
+  corsOrigins: ['https://admin.example.test'],
+  accessTokenSecret: 'test-only-access-secret-that-is-longer-than-32-characters',
+  refreshTokenSecret: 'test-only-refresh-and-session-secret-that-is-longer-than-64-characters-total',
+  accessTokenTtl: '15m', refreshTokenTtlMs: 604_800_000,
+  cookieName: 'test_refresh', cookieSecure: true, cookieSameSite: 'lax', bcryptRounds: 4,
+  trustProxy: 1, logLevel: 'silent', rateLimitWindowMs: 60_000, rateLimitMax: 300,
+  adminDistPath: 'missing-admin-dist', portalDistPath: 'missing-portal-dist',
 };
 
 class MemoryIdentityStore implements IdentityStore {
@@ -70,6 +78,7 @@ describe('identity and RBAC API', () => {
     expect(response.body.accessToken).toBeTypeOf('string');
     expect(response.body.user.passwordHash).toBeUndefined();
     expect(response.headers['set-cookie']?.[0]).toContain('HttpOnly');
+    expect(response.headers['set-cookie']?.[0]).toContain('Secure');
   });
 
   it('rejects an incorrect password with a generic error', async () => {
@@ -85,21 +94,24 @@ describe('identity and RBAC API', () => {
   });
 
   it('rotates a refresh token', async () => {
-    const agent = request.agent(app);
-    expect((await agent.post('/api/auth/login').send({ email: 'admin@example.test', password: adminPassword })).status).toBe(200);
+    const loggedIn = await request(app).post('/api/auth/login').send({ email: 'admin@example.test', password: adminPassword });
+    expect(loggedIn.status).toBe(200);
+    const cookie = loggedIn.headers['set-cookie']?.[0]?.split(';')[0];
+    expect(cookie).toBeTruthy();
     const firstSession = store.sessions[0]!;
-    const refreshed = await agent.post('/api/auth/refresh');
+    const refreshed = await request(app).post('/api/auth/refresh').set('Cookie', cookie!);
     expect(refreshed.status).toBe(200);
     expect(firstSession.revokedAt).toBeInstanceOf(Date);
     expect(store.sessions).toHaveLength(2);
   });
 
   it('revokes the session on logout', async () => {
-    const agent = request.agent(app);
-    await agent.post('/api/auth/login').send({ email: 'admin@example.test', password: adminPassword });
-    expect((await agent.post('/api/auth/logout')).status).toBe(204);
+    const loggedIn = await request(app).post('/api/auth/login').send({ email: 'admin@example.test', password: adminPassword });
+    const cookie = loggedIn.headers['set-cookie']?.[0]?.split(';')[0];
+    expect(cookie).toBeTruthy();
+    expect((await request(app).post('/api/auth/logout').set('Cookie', cookie!)).status).toBe(204);
     expect(store.sessions[0]?.revokedAt).toBeInstanceOf(Date);
-    expect((await agent.post('/api/auth/refresh')).status).toBe(401);
+    expect((await request(app).post('/api/auth/refresh').set('Cookie', cookie!)).status).toBe(401);
   });
 
   it('rejects protected access without authentication', async () => {

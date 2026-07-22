@@ -2,6 +2,19 @@
 
 All notable changes to Quran Hajrah Smart Platform are documented here.
 
+## [21.0.0] - 2026-07-22
+
+### Enterprise 21 Production Readiness
+
+- Added a unified production build and compiled-only start command.
+- Added single-process serving for the admin and portal SPAs through Express.
+- Added PostgreSQL readiness checks, deployment/status commands, and safe diagnostics.
+- Added strict production environment validation, proxy-aware secure cookies, and CORS allowlisting.
+- Added structured request logging, request IDs, process error handlers, and graceful shutdown.
+- Added production security headers, cache controls, and explicit API/static routing boundaries.
+- Added Hostinger Cloud environment, deployment, and rollback operator checklists.
+- Added production integration tests and a GitHub Actions production verification job.
+
 ## [20.2.0] - 2026-07-22
 
 ### Foundation and Identity RBAC Release

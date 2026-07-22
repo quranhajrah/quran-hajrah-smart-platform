@@ -47,8 +47,12 @@ Copy `.env.example` to `.env` and set values outside source control.
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection URL |
 | `JWT_ACCESS_SECRET` | Random signing secret of at least 32 characters |
-| `ACCESS_TOKEN_MINUTES` | Access-token lifetime; default 15 |
-| `REFRESH_TOKEN_DAYS` | Refresh-session lifetime; default 7 |
+| `ACCESS_TOKEN_TTL` | Access-token lifetime such as `15m` |
+| `REFRESH_TOKEN_TTL` | Refresh-session lifetime such as `7d` |
+| `JWT_REFRESH_SECRET` | HMAC secret used to hash opaque refresh tokens |
+| `SESSION_SECRET` | Independent secret combined into refresh-token hashing |
+| `COOKIE_SECURE` | Must be `true` in production |
+| `COOKIE_SAME_SITE` | `lax`, `strict`, or `none` |
 | `REFRESH_COOKIE_NAME` | Refresh cookie name |
 | `BCRYPT_ROUNDS` | Bcrypt work factor; default 12 |
 | `CORS_ORIGINS` | Comma-separated allowed admin origins |

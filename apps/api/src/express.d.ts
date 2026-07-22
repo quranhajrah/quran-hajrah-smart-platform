@@ -5,6 +5,7 @@ declare global {
     interface Request {
       identity?: IdentityUser;
       context: RequestMeta;
+      requestId: string;
     }
   }
 }

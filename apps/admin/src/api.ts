@@ -2,7 +2,7 @@ export type Role = { id: string; name: string; displayName: string; isSystem: bo
 export type User = { id: string; fullName: string; email: string; phone?: string; jobTitle?: string; isActive: boolean; roles: Role[] };
 export type AuthPayload = { accessToken: string; user: User; permissions: string[] };
 
-const baseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+const baseUrl = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '/api' : 'http://localhost:3000/api');
 let accessToken: string | null = null;
 export const setAccessToken = (token: string | null) => { accessToken = token; };
 

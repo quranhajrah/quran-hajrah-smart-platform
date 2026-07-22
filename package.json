@@ -1,6 +1,6 @@
 {
   "name": "quran-hajrah-smart-platform",
-  "version": "20.2.0",
+  "version": "21.0.0",
   "private": true,
   "type": "module",
   "description": "Quran Hajrah Smart Platform monorepo",
@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "concurrently -n admin,portal,api -c cyan,green,yellow \"npm run dev -w @quran-hajrah/admin\" \"npm run dev -w @quran-hajrah/portal\" \"npm run dev -w @quran-hajrah/api\"",
     "build": "npm run build --workspaces --if-present",
+    "build:production": "npm run db:generate && npm run build -w @quran-hajrah/database && npm run build -w @quran-hajrah/shared && npm run build -w @quran-hajrah/auth && npm run build -w @quran-hajrah/ui && npm run build -w @quran-hajrah/api && npm run build -w @quran-hajrah/admin && npm run build -w @quran-hajrah/portal",
+    "start:production": "node apps/api/dist/server.js",
+    "smoke:production": "node tooling/production-smoke.mjs",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint apps packages --ext .js,.cjs,.ts,.tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write .",
@@ -17,6 +20,9 @@
     "db:generate": "npm run generate -w @quran-hajrah/database",
     "db:validate": "npm run validate -w @quran-hajrah/database",
     "db:migrate": "npm run migrate:dev -w @quran-hajrah/database",
+    "db:deploy": "npm run migrate:deploy -w @quran-hajrah/database",
+    "db:status": "npm run migrate:status -w @quran-hajrah/database",
+    "db:diagnostics": "npm run diagnostics -w @quran-hajrah/database",
     "db:studio": "npm run studio -w @quran-hajrah/database"
     ,"db:seed": "npm run seed -w @quran-hajrah/database"
     ,"create:admin": "npm run create:admin -w @quran-hajrah/database"
