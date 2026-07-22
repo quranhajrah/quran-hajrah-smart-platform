@@ -20,7 +20,32 @@ const config = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   ...overrides,
 });
 
+const productionEnvironment = {
+  NODE_ENV: 'production',
+  JWT_ACCESS_SECRET: 'test-only-access-secret-that-is-longer-than-32-characters',
+  JWT_REFRESH_SECRET: 'test-only-refresh-secret-that-is-longer-than-32-characters',
+  SESSION_SECRET: 'test-only-session-secret-that-is-longer-than-32-characters',
+  DATABASE_URL: 'postgresql://test:test@127.0.0.1:5432/test',
+  DIRECT_URL: 'postgresql://test:test@127.0.0.1:5432/test',
+  ADMIN_ORIGIN: 'https://app.example.test',
+  PORTAL_ORIGIN: 'https://app.example.test',
+  CORS_ORIGINS: 'https://app.example.test',
+  COOKIE_SECURE: 'true',
+  COOKIE_SAME_SITE: 'lax',
+  ACCESS_TOKEN_TTL: '15m',
+  REFRESH_TOKEN_TTL: '7d',
+  TRUST_PROXY: '1',
+  LOG_LEVEL: 'silent',
+  RATE_LIMIT_WINDOW_MS: '60000',
+  RATE_LIMIT_MAX: '300',
+};
+
+const stubProductionEnvironment = () => {
+  for (const [name, value] of Object.entries(productionEnvironment)) vi.stubEnv(name, value);
+};
+
 afterEach(async () => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
@@ -34,28 +59,15 @@ describe('production runtime', () => {
   });
 
   it('defaults to port 3000 when PORT is missing in production', () => {
-    const environment = {
-      NODE_ENV: 'production',
-      JWT_ACCESS_SECRET: 'test-only-access-secret-that-is-longer-than-32-characters',
-      JWT_REFRESH_SECRET: 'test-only-refresh-secret-that-is-longer-than-32-characters',
-      SESSION_SECRET: 'test-only-session-secret-that-is-longer-than-32-characters',
-      DATABASE_URL: 'postgresql://test:test@127.0.0.1:5432/test',
-      DIRECT_URL: 'postgresql://test:test@127.0.0.1:5432/test',
-      ADMIN_ORIGIN: 'https://app.example.test',
-      PORTAL_ORIGIN: 'https://app.example.test',
-      CORS_ORIGINS: 'https://app.example.test',
-      COOKIE_SECURE: 'true',
-      COOKIE_SAME_SITE: 'lax',
-      ACCESS_TOKEN_TTL: '15m',
-      REFRESH_TOKEN_TTL: '7d',
-      TRUST_PROXY: '1',
-      LOG_LEVEL: 'silent',
-      RATE_LIMIT_WINDOW_MS: '60000',
-      RATE_LIMIT_MAX: '300',
-    };
-    for (const [name, value] of Object.entries(environment)) vi.stubEnv(name, value);
+    stubProductionEnvironment();
     vi.stubEnv('PORT', undefined);
     expect(loadConfig().port).toBe(3000);
+  });
+
+  it('maps TRUST_PROXY=true to one trusted proxy hop', () => {
+    stubProductionEnvironment();
+    vi.stubEnv('TRUST_PROXY', 'true');
+    expect(loadConfig().trustProxy).toBe(1);
   });
 
   it('reports liveness without querying the database', async () => {
@@ -76,6 +88,28 @@ describe('production runtime', () => {
     const response = await request(createApp({ config: config(), readinessCheck: async () => undefined })).get('/ready');
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: 'ready' });
+  });
+
+  it('uses the forwarded client IP behind one proxy and still enforces rate limits', async () => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const app = createApp({
+      config: config({ trustProxy: 1, rateLimitMax: 2 }),
+      readinessCheck: async () => undefined,
+      logger,
+    });
+    const forwardedFor = '203.0.113.42';
+
+    const health = await request(app).get('/health').set('X-Forwarded-For', forwardedFor);
+    const ready = await request(app).get('/ready').set('X-Forwarded-For', forwardedFor);
+    const limited = await request(app).get('/health').set('X-Forwarded-For', forwardedFor);
+
+    expect(health.status).toBe(200);
+    expect(ready.status).toBe(200);
+    expect(limited.status).toBe(429);
+    expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ event: 'http_request', ip: forwardedFor }));
+    expect(consoleError.mock.calls.flat().join(' ')).not.toContain('ERR_ERL_PERMISSIVE_TRUST_PROXY');
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('allows only configured CORS origins with credentials', async () => {

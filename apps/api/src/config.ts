@@ -17,7 +17,7 @@ export type AppConfig = {
   cookieSecure: boolean;
   cookieSameSite: SameSite;
   bcryptRounds: number;
-  trustProxy: boolean | number | string;
+  trustProxy: false | number;
   logLevel: string;
   rateLimitWindowMs: number;
   rateLimitMax: number;
@@ -51,10 +51,11 @@ const parseBoolean = (name: string, raw: string) => {
   throw new Error(`${name} must be true or false.`);
 };
 
-const parseTrustProxy = (raw: string): boolean | number | string => {
-  if (raw === 'true' || raw === 'false') return parseBoolean('TRUST_PROXY', raw);
-  if (/^\d+$/.test(raw)) return Number(raw);
-  return raw;
+const parseTrustProxy = (raw: string): false | number => {
+  if (raw === 'false') return false;
+  if (raw === 'true') return 1;
+  if (/^[1-9]\d*$/.test(raw)) return Number(raw);
+  throw new Error('TRUST_PROXY must be false or a positive proxy hop count.');
 };
 
 const validateOrigin = (name: string, origin: string) => {
