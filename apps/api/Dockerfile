@@ -21,6 +21,7 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/admin/dist ./apps/admin/dist
 COPY --from=build /app/apps/portal/dist ./apps/portal/dist
 COPY --from=build /app/packages/database/dist ./packages/database/dist
+COPY --from=build /app/packages/database/prisma ./packages/database/prisma
 COPY --from=build /app/packages/database/package.json ./packages/database/package.json
 COPY --from=build /app/package.json ./package.json
 USER node

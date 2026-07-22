@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { checkDatabaseConnection } from '@quran-hajrah/database';
+import { checkDatabaseConnection, checkPendingMigrations, initializePrisma } from '@quran-hajrah/database';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -16,8 +16,22 @@ import { createLogger, requestLogger, type Logger } from './logger.js';
 export type AppDependencies = {
   store?: IdentityStore;
   config?: AppConfig;
-  readinessCheck?: () => Promise<void>;
+  readinessChecks?: ReadinessChecks;
   logger?: Logger;
+};
+
+export type ReadinessChecks = {
+  prisma: () => Promise<void>;
+  database: () => Promise<void>;
+  migrations: () => Promise<void>;
+};
+
+type ReadinessCheckName = keyof ReadinessChecks;
+type ReadinessStatus = 'ok' | 'failed';
+
+const safeErrorMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/postgres(?:ql)?:\/\/[^\s@]+@/gi, 'postgresql://[redacted]@');
 };
 
 const setStaticHeaders = (response: express.Response, filePath: string) => {
@@ -31,7 +45,11 @@ const setStaticHeaders = (response: express.Response, filePath: string) => {
 export const createApp = (dependencies: AppDependencies = {}) => {
   const config = dependencies.config ?? loadConfig();
   const store = dependencies.store ?? new PrismaIdentityStore();
-  const readinessCheck = dependencies.readinessCheck ?? checkDatabaseConnection;
+  const readinessChecks = dependencies.readinessChecks ?? {
+    prisma: initializePrisma,
+    database: checkDatabaseConnection,
+    migrations: checkPendingMigrations,
+  };
   const logger = dependencies.logger ?? createLogger(config.logLevel);
   const app = express();
 
@@ -66,13 +84,29 @@ export const createApp = (dependencies: AppDependencies = {}) => {
   app.use(requestLogger(logger));
 
   app.get('/health', (_request, response) => response.json({ status: 'ok' }));
-  app.get('/ready', async (_request, response) => {
-    try {
-      await readinessCheck();
-      response.json({ status: 'ready' });
-    } catch {
-      response.status(503).json({ status: 'not_ready' });
+  app.get('/ready', async (request, response) => {
+    const checks: Record<ReadinessCheckName, ReadinessStatus> = { prisma: 'failed', database: 'failed', migrations: 'failed' };
+    logger.info({ event: 'readiness_check_started', requestId: request.requestId });
+    for (const check of ['prisma', 'database', 'migrations'] as const) {
+      logger.info({ event: 'readiness_check_step', requestId: request.requestId, check, status: 'started' });
+      try {
+        await readinessChecks[check]();
+        checks[check] = 'ok';
+        logger.info({ event: 'readiness_check_step', requestId: request.requestId, check, status: 'ok' });
+      } catch (error) {
+        const reason = safeErrorMessage(error);
+        logger.error({
+          event: 'readiness_check_failed',
+          requestId: request.requestId,
+          check,
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage: reason,
+        });
+        return response.status(503).json({ status: 'not_ready', checks, reason: `${check}: ${reason}` });
+      }
     }
+    logger.info({ event: 'readiness_check_completed', requestId: request.requestId, checks });
+    return response.json({ status: 'ready', checks });
   });
 
   app.use('/api', createIdentityRouter(store, config));

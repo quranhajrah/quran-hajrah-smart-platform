@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createApp } from './app.js';
+import { createApp, type ReadinessChecks } from './app.js';
 import { loadConfig, type AppConfig } from './config.js';
 
 const temporaryDirectories: string[] = [];
@@ -17,6 +17,13 @@ const config = (overrides: Partial<AppConfig> = {}): AppConfig => ({
   cookieName: 'test_refresh', cookieSecure: true, cookieSameSite: 'lax', bcryptRounds: 4,
   trustProxy: 1, logLevel: 'silent', rateLimitWindowMs: 60_000, rateLimitMax: 300,
   adminDistPath: 'missing-admin-dist', portalDistPath: 'missing-portal-dist',
+  ...overrides,
+});
+
+const readinessChecks = (overrides: Partial<ReadinessChecks> = {}): ReadinessChecks => ({
+  prisma: vi.fn(async () => undefined),
+  database: vi.fn(async () => undefined),
+  migrations: vi.fn(async () => undefined),
   ...overrides,
 });
 
@@ -71,23 +78,90 @@ describe('production runtime', () => {
   });
 
   it('reports liveness without querying the database', async () => {
-    const readinessCheck = vi.fn(async () => undefined);
-    const response = await request(createApp({ config: config(), readinessCheck })).get('/health');
+    const checks = readinessChecks();
+    const response = await request(createApp({ config: config(), readinessChecks: checks })).get('/health');
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: 'ok' });
-    expect(readinessCheck).not.toHaveBeenCalled();
+    expect(checks.prisma).not.toHaveBeenCalled();
+    expect(checks.database).not.toHaveBeenCalled();
+    expect(checks.migrations).not.toHaveBeenCalled();
   });
 
-  it('returns 503 when PostgreSQL is unavailable', async () => {
-    const response = await request(createApp({ config: config(), readinessCheck: async () => { throw new Error('unavailable'); } })).get('/ready');
-    expect(response.status).toBe(503);
-    expect(response.body).toEqual({ status: 'not_ready' });
-  });
-
-  it('returns 200 when the readiness database check succeeds', async () => {
-    const response = await request(createApp({ config: config(), readinessCheck: async () => undefined })).get('/ready');
+  it.each([
+    ['production', true],
+    ['development', false],
+  ])('returns detailed healthy checks in %s', async (nodeEnv, isProduction) => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const response = await request(createApp({
+      config: config({ nodeEnv, isProduction }),
+      readinessChecks: readinessChecks(),
+      logger,
+    })).get('/ready');
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ status: 'ready' });
+    expect(response.body).toEqual({
+      status: 'ready',
+      checks: { prisma: 'ok', database: 'ok', migrations: 'ok' },
+    });
+    for (const check of ['prisma', 'database', 'migrations']) {
+      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({
+        event: 'readiness_check_step', check, status: 'started',
+      }));
+      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({
+        event: 'readiness_check_step', check, status: 'ok',
+      }));
+    }
+    expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ event: 'readiness_check_completed' }));
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('returns and logs a failed database check', async () => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const response = await request(createApp({
+      config: config(),
+      readinessChecks: readinessChecks({ database: async () => { throw new Error('connection refused'); } }),
+      logger,
+    })).get('/ready');
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      status: 'not_ready',
+      checks: { prisma: 'ok', database: 'failed', migrations: 'failed' },
+      reason: 'database: connection refused',
+    });
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'readiness_check_failed', check: 'database', errorMessage: 'connection refused',
+    }));
+  });
+
+  it('returns and logs a failed Prisma initialization', async () => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const response = await request(createApp({
+      config: config(),
+      readinessChecks: readinessChecks({ prisma: async () => { throw new Error('client initialization failed'); } }),
+      logger,
+    })).get('/ready');
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      status: 'not_ready',
+      checks: { prisma: 'failed', database: 'failed', migrations: 'failed' },
+      reason: 'prisma: client initialization failed',
+    });
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ check: 'prisma', errorMessage: 'client initialization failed' }));
+  });
+
+  it('returns and logs pending migrations', async () => {
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const response = await request(createApp({
+      config: config(),
+      readinessChecks: readinessChecks({ migrations: async () => { throw new Error('Pending database migrations: 202607230001_example.'); } }),
+      logger,
+    })).get('/ready');
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      status: 'not_ready',
+      checks: { prisma: 'ok', database: 'ok', migrations: 'failed' },
+      reason: 'migrations: Pending database migrations: 202607230001_example.',
+    });
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ check: 'migrations' }));
   });
 
   it('uses the forwarded client IP behind one proxy and still enforces rate limits', async () => {
@@ -95,7 +169,7 @@ describe('production runtime', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const app = createApp({
       config: config({ trustProxy: 1, rateLimitMax: 2 }),
-      readinessCheck: async () => undefined,
+      readinessChecks: readinessChecks(),
       logger,
     });
     const forwardedFor = '203.0.113.42';
@@ -113,7 +187,7 @@ describe('production runtime', () => {
   });
 
   it('allows only configured CORS origins with credentials', async () => {
-    const app = createApp({ config: config(), readinessCheck: async () => undefined });
+    const app = createApp({ config: config(), readinessChecks: readinessChecks() });
     const allowed = await request(app).get('/health').set('Origin', 'https://app.example.test');
     const rejected = await request(app).get('/health').set('Origin', 'https://attacker.example');
     expect(allowed.status).toBe(200);
@@ -131,7 +205,7 @@ describe('production runtime', () => {
     await Promise.all([mkdir(adminDistPath, { recursive: true }), mkdir(portalDistPath, { recursive: true })]);
     await writeFile(path.join(adminDistPath, 'index.html'), '<main>admin-spa</main>');
     await writeFile(path.join(portalDistPath, 'index.html'), '<main>portal-spa</main>');
-    const app = createApp({ config: config({ adminDistPath, portalDistPath }), readinessCheck: async () => undefined });
+    const app = createApp({ config: config({ adminDistPath, portalDistPath }), readinessChecks: readinessChecks() });
 
     const admin = await request(app).get('/users/deep-link');
     const portal = await request(app).get('/portal/public/deep-link');
