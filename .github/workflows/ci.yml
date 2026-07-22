@@ -35,6 +35,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run db:generate
       - run: npm run security:check
       - run: npm run lint
       - run: npm run typecheck
