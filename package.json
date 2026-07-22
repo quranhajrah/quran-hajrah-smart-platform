@@ -11,9 +11,10 @@
   "scripts": {
     "dev": "concurrently -n admin,portal,api -c cyan,green,yellow \"npm run dev -w @quran-hajrah/admin\" \"npm run dev -w @quran-hajrah/portal\" \"npm run dev -w @quran-hajrah/api\"",
     "build": "npm run build --workspaces --if-present",
-    "postinstall": "prisma generate --schema packages/database/prisma/schema.prisma",
-    "build:production": "npm run db:generate && npm run build -w @quran-hajrah/database && npm run build -w @quran-hajrah/shared && npm run build -w @quran-hajrah/auth && npm run build -w @quran-hajrah/ui && npm run build -w @quran-hajrah/api && npm run build -w @quran-hajrah/admin && npm run build -w @quran-hajrah/portal",
-    "build:hostinger": "npm ci --include=dev && npm run build:production",
+    "postinstall": "node tooling/generate-prisma.mjs",
+    "build:artifacts": "npm run db:generate && npm run build -w @quran-hajrah/database && npm run build -w @quran-hajrah/shared && npm run build -w @quran-hajrah/auth && npm run build -w @quran-hajrah/ui && npm run build -w @quran-hajrah/api && npm run build -w @quran-hajrah/admin && npm run build -w @quran-hajrah/portal",
+    "build:production": "npm ci --include=dev && npm run build:artifacts",
+    "build:hostinger": "npm run build:production",
     "start:production": "node apps/api/dist/server.js",
     "smoke:production": "node tooling/production-smoke.mjs",
     "test": "npm run test --workspaces --if-present",

@@ -10,7 +10,7 @@ COPY packages/shared/package.json packages/shared/package.json
 COPY packages/ui/package.json packages/ui/package.json
 RUN npm ci
 COPY . .
-RUN npm run build:production
+RUN npm run build:artifacts
 RUN npm prune --omit=dev
 
 FROM node:20-alpine
