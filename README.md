@@ -57,6 +57,8 @@ npm run build:production
 npm run start:production
 ```
 
+For Hostinger's build-command field use `npm run build:hostinger`; it performs a clean install including devDependencies before invoking the same production build.
+
 Production serves admin at `/`, portal at `/portal/`, API at `/api`, liveness at `/health`, and PostgreSQL readiness at `/ready`. Configure every required environment value from `.env.example`; the production process intentionally fails when essential values are absent.
 
 Database deployment commands:

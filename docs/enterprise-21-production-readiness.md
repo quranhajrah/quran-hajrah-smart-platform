@@ -32,7 +32,7 @@ Use `.env.example` as a name checklist only. Enter real values in Hostinger hPan
 
 ## Hostinger Cloud
 
-Use the official public GitHub repository, branch `main`, Node.js 20.x, repository root, `npm run build:production`, and `npm run start:production`. The exact operator steps are in `hostinger/`.
+Use the official public GitHub repository, branch `main`, Node.js 20.x, repository root, `npm run build:hostinger`, and `npm run start:production`. The Hostinger build command performs a clean install with devDependencies before running `build:production`; the exact operator steps are in `hostinger/`.
 
 Hostinger documents GitHub import, Express support, selectable Node versions, environment variables in hPanel, custom domain connection, automatic SSL after connection, and deployment/runtime logs. Relevant official links are included in the Hostinger checklists.
 
