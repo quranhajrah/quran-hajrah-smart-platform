@@ -23,8 +23,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-quran_hajrah}?schema=public
-      DIRECT_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-quran_hajrah}?schema=public
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      DIRECT_URL: ${DIRECT_URL:?DIRECT_URL must be set}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}

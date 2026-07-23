@@ -19,7 +19,27 @@ console.log(JSON.stringify({
 }));
 
 const start = async () => {
-  await import('dotenv/config');
+  const databaseUrlWasProvidedByProcess = Boolean(process.env.DATABASE_URL?.trim());
+  const directUrlWasProvidedByProcess = Boolean(process.env.DIRECT_URL?.trim());
+  const databaseEnvironmentModule = await import('./database-environment.js');
+  if (databaseEnvironmentModule.shouldLoadDotenv(process.env.NODE_ENV)) await import('dotenv/config');
+
+  console.log(JSON.stringify({
+    level: 'info',
+    time: new Date().toISOString(),
+    event: 'prisma_connection_configuration',
+    database: databaseEnvironmentModule.summarizeDatabaseUrl(
+      'DATABASE_URL',
+      process.env.DATABASE_URL,
+      databaseEnvironmentModule.environmentSource(databaseUrlWasProvidedByProcess, process.env.DATABASE_URL),
+    ),
+    directDatabase: databaseEnvironmentModule.summarizeDatabaseUrl(
+      'DIRECT_URL',
+      process.env.DIRECT_URL,
+      databaseEnvironmentModule.environmentSource(directUrlWasProvidedByProcess, process.env.DIRECT_URL),
+    ),
+  }));
+
   const port = Number(process.env.PORT ?? 3000);
   const [databaseModule, appModule, configModule, lifecycleModule, loggerModule] = await Promise.all([
     import('@quran-hajrah/database'),

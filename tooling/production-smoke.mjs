@@ -85,6 +85,21 @@ try {
   }
 
   if (!stdout.includes('"event":"startup_initializing"')) throw new Error('Immediate startup log was not written to stdout.');
+  const startupRecords = stdout.split(/\r?\n/).flatMap((line) => {
+    try { return [JSON.parse(line)]; } catch { return []; }
+  });
+  const databaseConfiguration = startupRecords.find((record) => record.event === 'prisma_connection_configuration');
+  if (
+    databaseConfiguration?.database?.host !== '127.0.0.1'
+    || databaseConfiguration.database.port !== 5432
+    || databaseConfiguration.database.source !== 'process.env'
+    || databaseConfiguration.database.defaultUsed !== false
+  ) {
+    throw new Error('The safe Prisma connection target startup log is missing or incorrect.');
+  }
+  if (JSON.stringify(databaseConfiguration).includes('postgresql://')) {
+    throw new Error('The Prisma connection startup log exposed a connection string.');
+  }
   if (!stdout.includes('"event":"server_started"') || !stdout.includes('"host":"0.0.0.0"')) {
     throw new Error('Listening startup log did not confirm host 0.0.0.0.');
   }
