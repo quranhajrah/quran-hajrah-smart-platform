@@ -11,8 +11,8 @@ This directory is an operator guide, not an automated deployment. It contains no
 - Node.js: 20.x
 - Install: Hostinger-managed dependency installation followed by the explicit clean install in the build command
 - Build: `npm run build:production` (the existing Hostinger setting is supported directly)
-- Start: `npm run start:production`
-- Entry file when requested: `apps/api/dist/server.js`
+- Custom start command: not required or supported for this deployment
+- Entry file: `apps/api/dist/start.js`
 - Health path: `/health`
 - Readiness path: `/ready`
 - Target domain: `app.quran-hajrah.com`
@@ -21,7 +21,7 @@ Hostinger supports GitHub import for public Node.js applications and stores serv
 
 `build:production` runs `npm ci --include=dev` before `build:artifacts`. This installs TypeScript, declaration packages, Prisma tooling, and Vite for compilation even when Hostinger initially omits devDependencies. `build:hostinger` is an alias for the same command. Prisma CLI is also a runtime dependency because the production start command must remain migration-capable after `npm ci --omit=dev`; keep `NODE_ENV=production` for the running application.
 
-`start:production` first runs `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma`. Prisma uses the schema's `directUrl = env("DIRECT_URL")` for migration traffic, applies only committed pending migrations, and starts the compiled application only after that command succeeds. Do not replace this release step with `prisma migrate dev` or `prisma db push`. If hPanel accepts only an entry file rather than a start command, run `npm run db:deploy` from the approved deployment terminal before starting `apps/api/dist/server.js`.
+Hostinger launches `apps/api/dist/start.js` directly. This bootstrap first runs `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma`; Prisma uses the schema's `directUrl = env("DIRECT_URL")` for migration traffic and applies only committed pending migrations. It imports `apps/api/dist/server.js` only after a successful exit and terminates with code 1 on migration failure. Do not replace this bootstrap with `prisma migrate dev` or `prisma db push`.
 
 The root `postinstall` generates Prisma Client from the monorepo schema explicitly. It does not connect to PostgreSQL; database availability is reported separately by `/ready` and never blocks `/health` or the listening socket.
 
