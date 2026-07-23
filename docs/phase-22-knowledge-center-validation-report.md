@@ -152,8 +152,8 @@ The full `build:production` lifecycle includes `prisma migrate deploy`; its data
 
 ## Delivery status
 
-- Implementation commit: pending
-- Push: pending
-- GitHub Actions: pending
+- Implementation commit: `a809f19d40b436860ffb4c2fb1e2cdb6e37ffcc7`
+- Push: blocked locally because the Codex network-escalation usage limit was reached; `main` is one commit ahead of `origin/main`
+- GitHub Actions: not triggered because the push could not be authorized
 - Local status: successful
 - Production status: not claimed until the release is deployed and verified on `https://app.quran-hajrah.com`
