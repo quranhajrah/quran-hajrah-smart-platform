@@ -16,7 +16,8 @@
 - [ ] Add a Node.js Web App in hPanel.
 - [ ] Connect the official GitHub repository and select `main`.
 - [ ] Select Node.js 20.x.
-- [ ] Configure root and build values from `README.md`, and set the entry file to `apps/api/dist/start.js` so migrations cannot be skipped.
+- [ ] Configure root and build values from `README.md`, and set the entry file to `apps/api/dist/server.js`.
+- [ ] Confirm the build log shows `postbuild:production` executing `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` before runtime startup.
 - [ ] Deploy and inspect build/runtime logs without copying secrets.
 - [ ] Connect `app.quran-hajrah.com` through the Node.js app dashboard.
 - [ ] Apply required DNS records and wait for propagation.

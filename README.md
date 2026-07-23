@@ -59,7 +59,7 @@ npm run start:production
 
 Hostinger may use either `npm run build:production` or `npm run build:hostinger`; both perform a clean install including devDependencies before compiling the production artifacts.
 
-`start:production` launches `apps/api/dist/start.js`. This bootstrap always applies committed Prisma migrations through `DIRECT_URL` with `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` before importing the existing compiled server. The process exits with code 1 and the server is not started if migration deployment fails.
+Hostinger launches `apps/api/dist/server.js` directly so the HTTP listener is not delayed. The `postbuild:production` npm lifecycle applies committed Prisma migrations through `DIRECT_URL` with `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` after a successful production build and before Hostinger starts the runtime. `prestart:production` enforces the same migration for npm-managed production starts.
 
 Production serves admin at `/`, portal at `/portal/`, API at `/api`, liveness at `/health`, and PostgreSQL readiness at `/ready`. Configure every required environment value from `.env.example`; the production process intentionally fails when essential values are absent.
 
