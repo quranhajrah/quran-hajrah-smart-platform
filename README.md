@@ -56,7 +56,7 @@ npm run build:production
 npm run start:production
 ```
 
-Hostinger may use `npm run build:production` or `npm run build:hostinger`. Hostinger launches `apps/api/dist/server.js` directly so the HTTP listener is not delayed. `postbuild:production` applies committed migrations through `DIRECT_URL` with:
+Hostinger may use `npm run build:production` or `npm run build:hostinger`. Hostinger launches `apps/api/dist/server.js` directly so the HTTP listener is not delayed. `postbuild:production` applies committed migrations through `DIRECT_URL`, runs the idempotent system seed, and conditionally provisions the first administrator before Hostinger launches the entry file. The migration command remains:
 
 ```bash
 npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma
@@ -76,15 +76,14 @@ npm run create:admin
 
 `create:admin` requires `ADMIN_EMAIL` and `ADMIN_FULL_NAME`. When `ADMIN_PASSWORD` is omitted, it generates a strong temporary password and prints it once. If the email already exists, the command activates the account, rotates its password, revokes its sessions, and adds `super_admin` without creating a duplicate.
 
-First production administrator:
+Because Hostinger has no interactive production terminal, the one-time production bootstrap uses hPanel environment variables:
 
-```bash
-ADMIN_EMAIL='admin@quran-hajrah.com' \
-ADMIN_FULL_NAME='حسن محمد الزهراني' \
-npm run create:admin
-```
+1. Set `ADMIN_BOOTSTRAP_ENABLED=true`, `ADMIN_EMAIL`, `ADMIN_FULL_NAME`, and a strong `ADMIN_TEMP_PASSWORD`.
+2. Deploy once. The bootstrap creates or updates the user without logging the password.
+3. Verify login and change the temporary password.
+4. Remove all four bootstrap variables, or set `ADMIN_BOOTSTRAP_ENABLED=false` and remove the other three, then deploy again.
 
-Run this only in an approved interactive production terminal after `npm run db:seed`, capture the temporary password securely, and change it immediately after the first login. See `docs/first-production-super-administrator.md`.
+Bootstrap runs only when the enable flag is exactly `true`; missing or invalid values fail the deployment. See `docs/first-production-super-administrator.md`.
 
 ## Institutional Knowledge Center
 

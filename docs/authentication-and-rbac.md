@@ -46,23 +46,25 @@ Only `super_admin` receives every platform permission. Enterprise 22 grants docu
 
 Copy `.env.example` to `.env` and set values outside source control.
 
-| Variable              | Purpose                                                                                 |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| `DATABASE_URL`        | PostgreSQL connection URL                                                               |
-| `JWT_ACCESS_SECRET`   | Random signing secret of at least 32 characters                                         |
-| `ACCESS_TOKEN_TTL`    | Access-token lifetime such as `15m`                                                     |
-| `REFRESH_TOKEN_TTL`   | Refresh-session lifetime such as `7d`                                                   |
-| `JWT_REFRESH_SECRET`  | HMAC secret used to hash opaque refresh tokens                                          |
-| `SESSION_SECRET`      | Independent secret combined into refresh-token hashing                                  |
-| `COOKIE_SECURE`       | Must be `true` in production                                                            |
-| `COOKIE_SAME_SITE`    | `lax`, `strict`, or `none`                                                              |
-| `REFRESH_COOKIE_NAME` | Refresh cookie name                                                                     |
-| `BCRYPT_ROUNDS`       | Bcrypt work factor; default 12                                                          |
-| `CORS_ORIGINS`        | Comma-separated allowed admin origins                                                   |
-| `VITE_API_URL`        | Admin build-time API base URL                                                           |
-| `ADMIN_EMAIL`         | Email used only by `create:admin`                                                       |
-| `ADMIN_FULL_NAME`     | Name used only by `create:admin`                                                        |
-| `ADMIN_PASSWORD`      | Optional explicit password for `create:admin`; omit it to generate a temporary password |
+| Variable                  | Purpose                                                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `DATABASE_URL`            | PostgreSQL connection URL                                                               |
+| `JWT_ACCESS_SECRET`       | Random signing secret of at least 32 characters                                         |
+| `ACCESS_TOKEN_TTL`        | Access-token lifetime such as `15m`                                                     |
+| `REFRESH_TOKEN_TTL`       | Refresh-session lifetime such as `7d`                                                   |
+| `JWT_REFRESH_SECRET`      | HMAC secret used to hash opaque refresh tokens                                          |
+| `SESSION_SECRET`          | Independent secret combined into refresh-token hashing                                  |
+| `COOKIE_SECURE`           | Must be `true` in production                                                            |
+| `COOKIE_SAME_SITE`        | `lax`, `strict`, or `none`                                                              |
+| `REFRESH_COOKIE_NAME`     | Refresh cookie name                                                                     |
+| `BCRYPT_ROUNDS`           | Bcrypt work factor; default 12                                                          |
+| `CORS_ORIGINS`            | Comma-separated allowed admin origins                                                   |
+| `VITE_API_URL`            | Admin build-time API base URL                                                           |
+| `ADMIN_EMAIL`             | Email used only by `create:admin`                                                       |
+| `ADMIN_FULL_NAME`         | Name used only by `create:admin`                                                        |
+| `ADMIN_PASSWORD`          | Optional explicit password for `create:admin`; omit it to generate a temporary password |
+| `ADMIN_BOOTSTRAP_ENABLED` | Exact `true` enables the one-time Hostinger post-build bootstrap                        |
+| `ADMIN_TEMP_PASSWORD`     | Temporary Hostinger bootstrap secret; never logged and removed immediately after use    |
 
 Do not commit `.env`, credentials, generated database dumps, or backup files.
 
@@ -77,6 +79,8 @@ npm run create:admin
 ```
 
 `create:admin` requires `ADMIN_EMAIL` and `ADMIN_FULL_NAME` and a previously seeded `super_admin` role. When `ADMIN_PASSWORD` is absent, the command generates a strong temporary password and prints it exactly once. If the email exists, it updates the name and password, activates the account, adds `super_admin` without removing other roles, revokes existing refresh sessions, and records a system audit entry. There is no default credential.
+
+Hostinger's non-interactive path runs after migration and seed. It is disabled unless `ADMIN_BOOTSTRAP_ENABLED` equals `true` exactly and requires `ADMIN_EMAIL`, `ADMIN_FULL_NAME`, and `ADMIN_TEMP_PASSWORD`. Its password policy requires at least 12 characters with uppercase, lowercase, number, and special characters. It never logs the temporary password. Re-running it updates the same email rather than creating a duplicate; remove the bootstrap variables immediately after the first successful deployment.
 
 ## API authorization
 

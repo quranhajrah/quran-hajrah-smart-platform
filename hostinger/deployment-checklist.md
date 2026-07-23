@@ -7,11 +7,10 @@
 - [ ] Create and verify provider backups and point-in-time recovery where available.
 - [ ] Enter all values from `environment-checklist.md` in hPanel.
 - [ ] Run `npm run db:status` and `npm run db:diagnostics` from an approved secure environment.
-- [ ] Run `npm run db:deploy` against production; it executes `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` through `DIRECT_URL`.
-- [ ] Run `npm run db:seed`; it idempotently creates roles, permissions, and system document categories only.
+- [ ] Confirm `postbuild:production` will run `db:deploy`, `db:seed`, then the conditional administrator bootstrap in that order.
 - [ ] Provision and test the persistent non-public `DOCUMENT_STORAGE_ROOT`.
-- [ ] Run `npm run create:admin` once in an interactive terminal using `ADMIN_EMAIL` and `ADMIN_FULL_NAME`; do not run it as a build/start lifecycle.
-- [ ] Capture the generated temporary password once, sign in, change it immediately, and remove temporary administrator environment values.
+- [ ] For the first administrator only, add `ADMIN_BOOTSTRAP_ENABLED=true`, `ADMIN_EMAIL`, `ADMIN_FULL_NAME`, and `ADMIN_TEMP_PASSWORD` through hPanel.
+- [ ] Confirm the temporary password meets the 12-character uppercase/lowercase/number/special-character policy.
 
 ## Hostinger setup
 
@@ -19,7 +18,8 @@
 - [ ] Connect the official GitHub repository and select `main`.
 - [ ] Select Node.js 20.x.
 - [ ] Configure root and build values from `README.md`, and set the entry file to `apps/api/dist/server.js`.
-- [ ] Confirm the build log shows `postbuild:production` executing `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` before runtime startup.
+- [ ] Confirm the build log shows `postbuild:production` executing migration, seed, and a safe administrator-bootstrap completion message before runtime startup.
+- [ ] Confirm the build log never contains `ADMIN_TEMP_PASSWORD`.
 - [ ] Deploy and inspect build/runtime logs without copying secrets.
 - [ ] Connect `app.quran-hajrah.com` through the Node.js app dashboard.
 - [ ] Apply required DNS records and wait for propagation.
@@ -33,6 +33,9 @@
 - [ ] `/portal/` displays the portal shell.
 - [ ] An unauthenticated protected API route returns 401 JSON, not HTML.
 - [ ] Sign in with the initial administrator over HTTPS.
+- [ ] Change the temporary administrator password immediately.
+- [ ] Remove `ADMIN_TEMP_PASSWORD`, `ADMIN_EMAIL`, and `ADMIN_FULL_NAME` from hPanel.
+- [ ] Remove `ADMIN_BOOTSTRAP_ENABLED` or set it to `false`, then redeploy and confirm the bootstrap is skipped.
 - [ ] Confirm refresh, logout, and protected user listing.
 - [ ] Confirm Secure and HttpOnly on the refresh cookie.
 - [ ] Confirm runtime logs are structured and contain no credentials.

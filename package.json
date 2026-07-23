@@ -14,7 +14,7 @@
     "postinstall": "node tooling/generate-prisma.mjs",
     "build:artifacts": "npm run db:generate && npm run build -w @quran-hajrah/database && npm run build -w @quran-hajrah/shared && npm run build -w @quran-hajrah/auth && npm run build -w @quran-hajrah/ui && npm run build -w @quran-hajrah/api && npm run build -w @quran-hajrah/admin && npm run build -w @quran-hajrah/portal && npm run validate:production-startup",
     "build:production": "npm ci --include=dev && npm run build:artifacts",
-    "postbuild:production": "npm run db:deploy",
+    "postbuild:production": "npm run db:deploy && npm run db:seed && npm run admin:bootstrap:production",
     "build:hostinger": "npm run build:production",
     "deploy:production": "npm run start:production",
     "prestart:production": "npm run db:deploy",
@@ -35,6 +35,7 @@
     "db:diagnostics": "npm run diagnostics -w @quran-hajrah/database",
     "db:studio": "npm run studio -w @quran-hajrah/database",
     "db:seed": "npm run seed -w @quran-hajrah/database",
+    "admin:bootstrap:production": "node packages/database/dist/bootstrap-admin.js",
     "create:admin": "node packages/database/dist/create-admin.js",
     "create:admin:dev": "npm run create:admin:dev -w @quran-hajrah/database"
   },

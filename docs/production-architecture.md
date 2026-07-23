@@ -39,7 +39,7 @@ API and health routes are registered before static handling and can never fall t
 - `apps/portal/dist`
 - `packages/*/dist`
 
-Hostinger launches `apps/api/dist/server.js` directly so Express calls `listen()` within the platform startup window. The `postbuild:production` npm lifecycle applies committed Prisma migrations through `DIRECT_URL` after the production build and before Hostinger launches the runtime; `prestart:production` applies the same guard when npm manages startup. The API runtime does not use Vite, tsx, or ts-node. Express listens on the validated `process.env.PORT` supplied by Hostinger.
+Hostinger launches `apps/api/dist/server.js` directly so Express calls `listen()` within the platform startup window. The `postbuild:production` npm lifecycle applies committed Prisma migrations through `DIRECT_URL`, runs the idempotent system seed, and invokes the disabled-by-default administrator bootstrap after the production build and before Hostinger launches the runtime. The bootstrap imports Prisma only when `ADMIN_BOOTSTRAP_ENABLED` is exactly `true`, and it never logs its temporary password. `prestart:production` applies the migration guard when npm manages startup. The API runtime does not use Vite, tsx, or ts-node. Express listens on the validated `process.env.PORT` supplied by Hostinger.
 
 Admin uses `/api` by default in production, so no server environment variable is exposed through Vite. Portal is built with `/portal/` as its asset base.
 
@@ -65,6 +65,7 @@ Refresh cookies are HttpOnly, Secure in production, configurable as SameSite Lax
 - `npm run db:status` — `prisma migrate status`
 - `npm run db:seed` — system roles, permissions, and document categories
 - `npm run db:diagnostics` — safe connectivity result without URL output
+- `npm run admin:bootstrap:production` — non-interactive, opt-in Hostinger administrator provisioning
 - `npm run create:admin` — idempotent first-administrator provisioning with a generated temporary password when `ADMIN_PASSWORD` is omitted
 
 The managed Hostinger Node.js database wizard currently documents Supabase as its PostgreSQL option. Any compatible managed PostgreSQL provider may be used if it permits the required pooled and direct connections. Hostinger does not modify application database code; see the [current Node.js deployment guide](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/).

@@ -14,6 +14,7 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 - Added idempotent seed data for 16 institutional categories and future AI contracts without external calls.
 - Added API, authorization, upload-security, storage-boundary, and interface validation coverage.
 - Made first-super-administrator provisioning idempotent and production-safe, with a one-time generated password, session revocation, and audit logging.
+- Added a disabled-by-default Hostinger post-build administrator bootstrap that never logs its temporary password and can be removed after one deployment.
 
 ## [21.0.0] - 2026-07-22
 

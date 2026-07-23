@@ -16,7 +16,11 @@ export type SuperAdministratorResult = {
 };
 
 export const temporaryPasswordPolicy = (password: string) =>
-  password.length >= 12 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password);
+  password.length >= 12 &&
+  /[A-Z]/.test(password) &&
+  /[a-z]/.test(password) &&
+  /\d/.test(password) &&
+  /[^A-Za-z0-9\s]/.test(password);
 
 export const generateTemporaryPassword = (length = 32) => {
   if (length < 12) throw new Error('Temporary passwords must contain at least 12 characters.');

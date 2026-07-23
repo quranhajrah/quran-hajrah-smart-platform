@@ -27,12 +27,15 @@ Enter values through Hostinger hPanel. Hostinger documents that deployment envir
 - [ ] `DOCUMENT_STORAGE_ROOT` points to a writable, persistent, non-public directory
 - [ ] `DOCUMENT_MAX_FILE_SIZE_MB=25` or the approved operational limit
 
-## First administrator, temporary operator environment only
+## First administrator, one deployment only
 
-- [ ] `ADMIN_EMAIL`
-- [ ] `ADMIN_FULL_NAME`
-- [ ] Leave `ADMIN_PASSWORD` unset to generate a temporary password, or set an approved value satisfying policy
-- [ ] Run the command only in an approved interactive terminal and capture generated output securely
-- [ ] Remove the administrator variables after successful creation if operationally supported
+- [ ] Set `ADMIN_BOOTSTRAP_ENABLED=true` exactly; all other values skip the bootstrap.
+- [ ] Set `ADMIN_EMAIL` to the intended production administrator address.
+- [ ] Set `ADMIN_FULL_NAME` to the intended production administrator name.
+- [ ] Set `ADMIN_TEMP_PASSWORD` to a unique value of at least 12 characters containing uppercase, lowercase, number, and special characters.
+- [ ] Deploy once and verify that the safe bootstrap completion message appears without a password.
+- [ ] Sign in over HTTPS and immediately change the temporary password.
+- [ ] Remove `ADMIN_TEMP_PASSWORD`, `ADMIN_EMAIL`, and `ADMIN_FULL_NAME`.
+- [ ] Remove `ADMIN_BOOTSTRAP_ENABLED` or change it to `false`, then redeploy to verify the bootstrap is skipped.
 
 Never paste secrets into build logs, GitHub issues, source files, documentation, or chat.
