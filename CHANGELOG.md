@@ -2,6 +2,18 @@
 
 All notable changes to Quran Hajrah Smart Platform are documented here.
 
+## [22.0.0] - 2026-07-23
+
+### Enterprise 22 Institutional Knowledge Center
+
+- Added production document, category, version, tag, access-rule, and audit models with a committed additive Prisma migration.
+- Added protected metadata, upload, search, filter, download, version, archive, restore, soft-delete, dashboard, and audit APIs.
+- Added local/Hostinger storage behind a provider interface with path containment, opaque names, type/signature checks, and size limits.
+- Added confidentiality-aware authorization and nine narrowly scoped document permissions.
+- Added the Arabic RTL executive document dashboard, upload workflow, advanced filters, details, version history, and audit history.
+- Added idempotent seed data for 16 institutional categories and future AI contracts without external calls.
+- Added API, authorization, upload-security, storage-boundary, and interface validation coverage.
+
 ## [21.0.0] - 2026-07-22
 
 ### Enterprise 21 Production Readiness

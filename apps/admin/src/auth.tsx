@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { api, setAccessToken, type AuthPayload, type User } from './api';
 
 type AuthValue = {
@@ -24,17 +32,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    api<AuthPayload>('/auth/refresh', { method: 'POST' }).then(applyAuth).catch(() => applyAuth(null)).finally(() => setLoading(false));
+    api<AuthPayload>('/auth/refresh', { method: 'POST' })
+      .then(applyAuth)
+      .catch(() => applyAuth(null))
+      .finally(() => setLoading(false));
   }, [applyAuth]);
 
-  const value = useMemo<AuthValue>(() => ({
-    user,
-    permissions,
-    loading,
-    async login(email, password) { applyAuth(await api<AuthPayload>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })); },
-    async logout() { await api('/auth/logout', { method: 'POST' }); applyAuth(null); },
-    can: (permission) => permissions.includes(permission),
-  }), [applyAuth, loading, permissions, user]);
+  const value = useMemo<AuthValue>(
+    () => ({
+      user,
+      permissions,
+      loading,
+      async login(email, password) {
+        applyAuth(
+          await api<AuthPayload>('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+          }),
+        );
+      },
+      async logout() {
+        await api('/auth/logout', { method: 'POST' });
+        applyAuth(null);
+      },
+      can: (permission) => permissions.includes(permission),
+    }),
+    [applyAuth, loading, permissions, user],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

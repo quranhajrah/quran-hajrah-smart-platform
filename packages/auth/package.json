@@ -1,5 +1,16 @@
 {
-  "name": "@quran-hajrah/auth", "version": "21.0.0", "private": true, "type": "module", "main": "dist/index.js", "types": "dist/index.d.ts",
-  "scripts": { "build": "tsc", "test": "vitest run --passWithNoTests", "typecheck": "tsc --noEmit" },
-  "devDependencies": { "vitest": "^2.1.8" }
+  "name": "@quran-hajrah/auth",
+  "version": "22.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
 }

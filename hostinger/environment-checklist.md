@@ -24,6 +24,8 @@ Enter values through Hostinger hPanel. Hostinger documents that deployment envir
 - [ ] `RATE_LIMIT_WINDOW_MS=60000`
 - [ ] `RATE_LIMIT_MAX=300`
 - [ ] `BCRYPT_ROUNDS=12`
+- [ ] `DOCUMENT_STORAGE_ROOT` points to a writable, persistent, non-public directory
+- [ ] `DOCUMENT_MAX_FILE_SIZE_MB=25` or the approved operational limit
 
 ## First administrator, temporary operator environment only
 

@@ -26,3 +26,9 @@ Hostinger launches `apps/api/dist/server.js` directly so Express can call `liste
 The root `postinstall` generates Prisma Client from the monorepo schema explicitly. It does not connect to PostgreSQL; database availability is reported separately by `/ready` and never blocks `/health` or the listening socket.
 
 Complete the environment, deployment, and rollback checklists before declaring production success.
+
+## Enterprise 22 document storage
+
+Set `DOCUMENT_STORAGE_ROOT` to a persistent Hostinger directory that is writable by the Node.js process and is not publicly served. Do not place it below an exposed static/public directory. The application creates document-specific subdirectories and opaque file names at runtime. Set `DOCUMENT_MAX_FILE_SIZE_MB` to the approved upload limit (25 by default).
+
+The PostgreSQL backup and file-storage backup form one recovery unit. Back up both on a coordinated schedule, encrypt exports, restrict operator access, and test restoration outside production. A database restore without matching files leaves version metadata whose binaries are unavailable; a file restore without the matching database leaves unreferenced files.

@@ -36,8 +36,11 @@ System roles are seeded idempotently. Only `super_admin` receives all permission
 - Users: `users.view`, `users.create`, `users.update`, `users.disable`, `users.assign_roles`
 - Roles: `roles.view`, `roles.manage`
 - Platform: `dashboard.view`, `audit.view`, `settings.manage`
+- Documents: `documents.view`, `documents.create`, `documents.update`, `documents.upload`, `documents.download`, `documents.archive`, `documents.delete`, `documents.audit`, `documents.manage_access`
 
 Permissions are rows keyed by a stable dotted code and grouped by `module`, allowing future modules to add permission records without changing authorization middleware.
+
+Only `super_admin` receives every platform permission. Enterprise 22 grants document permissions narrowly by existing institutional role. Confidential and highly confidential documents also pass a separate role/access-rule check, so possession of `documents.view` alone does not reveal restricted records. Direct document access rules can target one user or one role, expire automatically, and separately allow view, download, or edit.
 
 ## Environment variables
 
@@ -86,7 +89,7 @@ The final active super administrator cannot disable itself or lose its super-adm
 npm run test
 ```
 
-The test store is created fresh before every test and exists only in process memory. Tests cover valid and invalid login, inactive users, refresh rotation, logout revocation, authentication and permission denial, allowed access, user creation, hash omission, last-super-admin protection, and audit creation.
+The test stores are created fresh before every test and exist only in process memory. Tests cover valid and invalid login, inactive users, refresh rotation, logout revocation, authentication and permission denial, allowed access, user creation, hash omission, last-super-admin protection, document confidentiality, file upload controls, and audit creation.
 
 ## Security considerations
 

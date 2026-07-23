@@ -19,6 +19,7 @@ coverage/
 *.backup
 backups/
 uploads/
+.data/
 private/
 secrets/
 credentials*.json

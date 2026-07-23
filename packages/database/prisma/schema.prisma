@@ -3,41 +3,49 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id              String         @id @default(uuid()) @db.Uuid
-  fullName        String
-  email           String         @unique
-  passwordHash    String
-  phone           String?
-  jobTitle        String?
-  isActive        Boolean        @default(true)
-  lastLoginAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  roles           UserRole[]     @relation("UserRoles")
-  roleAssignments UserRole[]     @relation("AssignedBy")
-  refreshTokens   RefreshToken[]
-  auditLogs       AuditLog[]
+  id                         String               @id @default(uuid()) @db.Uuid
+  fullName                   String
+  email                      String               @unique
+  passwordHash               String
+  phone                      String?
+  jobTitle                   String?
+  isActive                   Boolean              @default(true)
+  lastLoginAt                DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  roles                      UserRole[]           @relation("UserRoles")
+  roleAssignments            UserRole[]           @relation("AssignedBy")
+  refreshTokens              RefreshToken[]
+  auditLogs                  AuditLog[]
+  documentsCreated           Document[]           @relation("DocumentCreatedBy")
+  documentsUpdated           Document[]           @relation("DocumentUpdatedBy")
+  documentsDeleted           Document[]           @relation("DocumentDeletedBy")
+  documentVersions           DocumentVersion[]    @relation("DocumentVersionCreatedBy")
+  documentAccessRules        DocumentAccessRule[] @relation("DocumentAccessUser")
+  documentAccessRulesCreated DocumentAccessRule[] @relation("DocumentAccessCreatedBy")
+  documentAuditLogs          DocumentAuditLog[]
 
   @@index([isActive])
   @@index([createdAt])
 }
 
 model Role {
-  id          String           @id @default(uuid()) @db.Uuid
-  name        String           @unique
-  displayName String
-  description String?
-  isSystem    Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  users       UserRole[]
-  permissions RolePermission[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  name                String               @unique
+  displayName         String
+  description         String?
+  isSystem            Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  users               UserRole[]
+  permissions         RolePermission[]
+  documentAccessRules DocumentAccessRule[]
 }
 
 model Permission {
@@ -66,10 +74,10 @@ model UserRole {
 }
 
 model RolePermission {
-  roleId      String     @db.Uuid
-  permissionId String    @db.Uuid
-  role        Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission  Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
   @@index([permissionId])
@@ -107,4 +115,198 @@ model AuditLog {
   @@index([action, createdAt])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+enum DocumentStatus {
+  DRAFT
+  ACTIVE
+  UNDER_REVIEW
+  EXPIRED
+  ARCHIVED
+}
+
+enum ConfidentialityLevel {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  HIGHLY_CONFIDENTIAL
+}
+
+enum DocumentType {
+  STRATEGIC_PLAN
+  OPERATIONAL_PLAN
+  BUDGET
+  POLICY
+  REGULATION
+  REPORT
+  MINUTES
+  LETTER
+  CONTRACT
+  GOVERNANCE
+  FINANCIAL
+  PROGRAM
+  EMPLOYEE
+  EDUCATIONAL
+  MEDIA
+  OTHER
+}
+
+enum DocumentAuditAction {
+  CREATED
+  UPLOADED
+  VIEWED
+  DOWNLOADED
+  UPDATED
+  VERSION_UPLOADED
+  ARCHIVED
+  RESTORED
+  DELETED
+}
+
+model DocumentCategory {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  documents   Document[]
+
+  @@index([isActive, sortOrder])
+}
+
+model Document {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  title                String
+  description          String?
+  originalFileName     String?
+  storedFileName       String?
+  mimeType             String?
+  fileSize             BigInt?
+  storagePath          String?                 @unique
+  categoryId           String                  @db.Uuid
+  documentType         DocumentType
+  documentNumber       String?
+  documentDate         DateTime?               @db.Date
+  effectiveDate        DateTime?               @db.Date
+  expiryDate           DateTime?               @db.Date
+  versionNumber        Int                     @default(0)
+  status               DocumentStatus          @default(DRAFT)
+  confidentialityLevel ConfidentialityLevel    @default(INTERNAL)
+  owningDepartment     String
+  keywords             String[]                @default([])
+  isArchived           Boolean                 @default(false)
+  deletedAt            DateTime?
+  deletedById          String?                 @db.Uuid
+  createdById          String                  @db.Uuid
+  updatedById          String                  @db.Uuid
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  category             DocumentCategory        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdBy            User                    @relation("DocumentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy            User                    @relation("DocumentUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  deletedBy            User?                   @relation("DocumentDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  versions             DocumentVersion[]
+  tags                 DocumentTagAssignment[]
+  accessRules          DocumentAccessRule[]
+  auditLogs            DocumentAuditLog[]
+
+  @@index([categoryId, status])
+  @@index([documentType, status])
+  @@index([confidentialityLevel, status])
+  @@index([owningDepartment, status])
+  @@index([documentDate])
+  @@index([expiryDate, status])
+  @@index([isArchived, deletedAt])
+  @@index([createdAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model DocumentVersion {
+  id               String             @id @default(uuid()) @db.Uuid
+  documentId       String             @db.Uuid
+  versionNumber    Int
+  originalFileName String
+  storedFileName   String
+  mimeType         String
+  fileSize         BigInt
+  storagePath      String             @unique
+  checksum         String
+  notes            String?
+  createdById      String             @db.Uuid
+  createdAt        DateTime           @default(now())
+  document         Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy        User               @relation("DocumentVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  auditLogs        DocumentAuditLog[]
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, createdAt])
+  @@index([createdById])
+}
+
+model DocumentTag {
+  id          String                  @id @default(uuid()) @db.Uuid
+  name        String                  @unique
+  slug        String                  @unique
+  createdAt   DateTime                @default(now())
+  assignments DocumentTagAssignment[]
+}
+
+model DocumentTagAssignment {
+  documentId String      @db.Uuid
+  tagId      String      @db.Uuid
+  assignedAt DateTime    @default(now())
+  document   Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag        DocumentTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+  @@index([tagId])
+}
+
+model DocumentAccessRule {
+  id          String    @id @default(uuid()) @db.Uuid
+  documentId  String    @db.Uuid
+  userId      String?   @db.Uuid
+  roleId      String?   @db.Uuid
+  canView     Boolean   @default(true)
+  canDownload Boolean   @default(false)
+  canEdit     Boolean   @default(false)
+  expiresAt   DateTime?
+  createdById String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User?     @relation("DocumentAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  role        Role?     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation("DocumentAccessCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([documentId, userId])
+  @@unique([documentId, roleId])
+  @@index([userId, documentId])
+  @@index([roleId, documentId])
+  @@index([expiresAt])
+  @@index([createdById])
+}
+
+model DocumentAuditLog {
+  id          String              @id @default(uuid()) @db.Uuid
+  documentId  String              @db.Uuid
+  versionId   String?             @db.Uuid
+  userId      String?             @db.Uuid
+  action      DocumentAuditAction
+  description String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime            @default(now())
+  document    Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version     DocumentVersion?    @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  user        User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([documentId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([versionId])
 }

@@ -8,7 +8,8 @@
 - [ ] Enter all values from `environment-checklist.md` in hPanel.
 - [ ] Run `npm run db:status` and `npm run db:diagnostics` from an approved secure environment.
 - [ ] Run `npm run db:deploy` against production; it executes `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` through `DIRECT_URL`.
-- [ ] Run `npm run db:seed`; it creates roles and permissions only.
+- [ ] Run `npm run db:seed`; it idempotently creates roles, permissions, and system document categories only.
+- [ ] Provision and test the persistent non-public `DOCUMENT_STORAGE_ROOT`.
 - [ ] Run `npm run create:admin` once using temporary environment values.
 
 ## Hostinger setup
@@ -34,5 +35,7 @@
 - [ ] Confirm refresh, logout, and protected user listing.
 - [ ] Confirm Secure and HttpOnly on the refresh cookie.
 - [ ] Confirm runtime logs are structured and contain no credentials.
+- [ ] Open the Knowledge Center, upload an approved test PDF, download it, add a version, archive it, restore it, and verify its audit history.
+- [ ] Confirm binary files persist after a controlled redeploy.
 
 Do not mark production successful until DNS, SSL, readiness, database migration, and login are all verified on the real domain.

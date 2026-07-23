@@ -8,15 +8,29 @@ import { loadConfig, type AppConfig } from './config.js';
 
 const temporaryDirectories: string[] = [];
 const config = (overrides: Partial<AppConfig> = {}): AppConfig => ({
-  nodeEnv: 'production', isProduction: true, port: 3000,
-  adminOrigin: 'https://app.example.test', portalOrigin: 'https://app.example.test',
+  nodeEnv: 'production',
+  isProduction: true,
+  port: 3000,
+  adminOrigin: 'https://app.example.test',
+  portalOrigin: 'https://app.example.test',
   corsOrigins: ['https://app.example.test'],
   accessTokenSecret: 'test-only-access-secret-that-is-longer-than-32-characters',
-  refreshTokenSecret: 'test-only-refresh-and-session-secret-that-is-longer-than-64-characters-total',
-  accessTokenTtl: '15m', refreshTokenTtlMs: 604_800_000,
-  cookieName: 'test_refresh', cookieSecure: true, cookieSameSite: 'lax', bcryptRounds: 4,
-  trustProxy: 1, logLevel: 'silent', rateLimitWindowMs: 60_000, rateLimitMax: 300,
-  adminDistPath: 'missing-admin-dist', portalDistPath: 'missing-portal-dist',
+  refreshTokenSecret:
+    'test-only-refresh-and-session-secret-that-is-longer-than-64-characters-total',
+  accessTokenTtl: '15m',
+  refreshTokenTtlMs: 604_800_000,
+  cookieName: 'test_refresh',
+  cookieSecure: true,
+  cookieSameSite: 'lax',
+  bcryptRounds: 4,
+  trustProxy: 1,
+  logLevel: 'silent',
+  rateLimitWindowMs: 60_000,
+  rateLimitMax: 300,
+  adminDistPath: 'missing-admin-dist',
+  portalDistPath: 'missing-portal-dist',
+  documentStorageRoot: 'missing-document-storage',
+  documentMaxFileSizeBytes: 25 * 1024 * 1024,
   ...overrides,
 });
 
@@ -54,12 +68,25 @@ const stubProductionEnvironment = () => {
 afterEach(async () => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  );
 });
 
 describe('production runtime', () => {
   it('fails startup when production secrets are missing', () => {
-    const names = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'SESSION_SECRET', 'DATABASE_URL', 'DIRECT_URL', 'ADMIN_ORIGIN', 'PORTAL_ORIGIN', 'CORS_ORIGINS'];
+    const names = [
+      'JWT_ACCESS_SECRET',
+      'JWT_REFRESH_SECRET',
+      'SESSION_SECRET',
+      'DATABASE_URL',
+      'DIRECT_URL',
+      'ADMIN_ORIGIN',
+      'PORTAL_ORIGIN',
+      'CORS_ORIGINS',
+    ];
     for (const name of names) vi.stubEnv(name, '');
     vi.stubEnv('NODE_ENV', 'production');
     expect(() => loadConfig()).toThrow('JWT_ACCESS_SECRET is required.');
@@ -79,7 +106,9 @@ describe('production runtime', () => {
 
   it('reports liveness without querying the database', async () => {
     const checks = readinessChecks();
-    const response = await request(createApp({ config: config(), readinessChecks: checks })).get('/health');
+    const response = await request(createApp({ config: config(), readinessChecks: checks })).get(
+      '/health',
+    );
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: 'ok' });
     expect(checks.prisma).not.toHaveBeenCalled();
@@ -92,69 +121,105 @@ describe('production runtime', () => {
     ['development', false],
   ])('returns detailed healthy checks in %s', async (nodeEnv, isProduction) => {
     const logger = { info: vi.fn(), error: vi.fn() };
-    const response = await request(createApp({
-      config: config({ nodeEnv, isProduction }),
-      readinessChecks: readinessChecks(),
-      logger,
-    })).get('/ready');
+    const response = await request(
+      createApp({
+        config: config({ nodeEnv, isProduction }),
+        readinessChecks: readinessChecks(),
+        logger,
+      }),
+    ).get('/ready');
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       status: 'ready',
       checks: { prisma: 'ok', database: 'ok', migrations: 'ok' },
     });
     for (const check of ['prisma', 'database', 'migrations']) {
-      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({
-        event: 'readiness_check_step', check, status: 'started',
-      }));
-      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({
-        event: 'readiness_check_step', check, status: 'ok',
-      }));
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'readiness_check_step',
+          check,
+          status: 'started',
+        }),
+      );
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'readiness_check_step',
+          check,
+          status: 'ok',
+        }),
+      );
     }
-    expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ event: 'readiness_check_completed' }));
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'readiness_check_completed' }),
+    );
     expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('returns and logs a failed database check', async () => {
     const logger = { info: vi.fn(), error: vi.fn() };
-    const response = await request(createApp({
-      config: config(),
-      readinessChecks: readinessChecks({ database: async () => { throw new Error('connection refused'); } }),
-      logger,
-    })).get('/ready');
+    const response = await request(
+      createApp({
+        config: config(),
+        readinessChecks: readinessChecks({
+          database: async () => {
+            throw new Error('connection refused');
+          },
+        }),
+        logger,
+      }),
+    ).get('/ready');
     expect(response.status).toBe(503);
     expect(response.body).toEqual({
       status: 'not_ready',
       checks: { prisma: 'ok', database: 'failed', migrations: 'failed' },
       reason: 'database: connection refused',
     });
-    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({
-      event: 'readiness_check_failed', check: 'database', errorMessage: 'connection refused',
-    }));
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'readiness_check_failed',
+        check: 'database',
+        errorMessage: 'connection refused',
+      }),
+    );
   });
 
   it('returns and logs a failed Prisma initialization', async () => {
     const logger = { info: vi.fn(), error: vi.fn() };
-    const response = await request(createApp({
-      config: config(),
-      readinessChecks: readinessChecks({ prisma: async () => { throw new Error('client initialization failed'); } }),
-      logger,
-    })).get('/ready');
+    const response = await request(
+      createApp({
+        config: config(),
+        readinessChecks: readinessChecks({
+          prisma: async () => {
+            throw new Error('client initialization failed');
+          },
+        }),
+        logger,
+      }),
+    ).get('/ready');
     expect(response.status).toBe(503);
     expect(response.body).toEqual({
       status: 'not_ready',
       checks: { prisma: 'failed', database: 'failed', migrations: 'failed' },
       reason: 'prisma: client initialization failed',
     });
-    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ check: 'prisma', errorMessage: 'client initialization failed' }));
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ check: 'prisma', errorMessage: 'client initialization failed' }),
+    );
   });
 
   it('returns and logs pending migrations', async () => {
     const logger = { info: vi.fn(), error: vi.fn() };
-    const response = await request(createApp({
-      config: config(),
-      readinessChecks: readinessChecks({ migrations: async () => { throw new Error('Pending database migrations: 202607230001_example.'); } }),
-      logger,
-    })).get('/ready');
+    const response = await request(
+      createApp({
+        config: config(),
+        readinessChecks: readinessChecks({
+          migrations: async () => {
+            throw new Error('Pending database migrations: 202607230001_example.');
+          },
+        }),
+        logger,
+      }),
+    ).get('/ready');
     expect(response.status).toBe(503);
     expect(response.body).toEqual({
       status: 'not_ready',
@@ -181,8 +246,12 @@ describe('production runtime', () => {
     expect(health.status).toBe(200);
     expect(ready.status).toBe(200);
     expect(limited.status).toBe(429);
-    expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ event: 'http_request', ip: forwardedFor }));
-    expect(consoleError.mock.calls.flat().join(' ')).not.toContain('ERR_ERL_PERMISSIVE_TRUST_PROXY');
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'http_request', ip: forwardedFor }),
+    );
+    expect(consoleError.mock.calls.flat().join(' ')).not.toContain(
+      'ERR_ERL_PERMISSIVE_TRUST_PROXY',
+    );
     expect(logger.error).not.toHaveBeenCalled();
   });
 
@@ -202,10 +271,16 @@ describe('production runtime', () => {
     temporaryDirectories.push(root);
     const adminDistPath = path.join(root, 'admin');
     const portalDistPath = path.join(root, 'portal');
-    await Promise.all([mkdir(adminDistPath, { recursive: true }), mkdir(portalDistPath, { recursive: true })]);
+    await Promise.all([
+      mkdir(adminDistPath, { recursive: true }),
+      mkdir(portalDistPath, { recursive: true }),
+    ]);
     await writeFile(path.join(adminDistPath, 'index.html'), '<main>admin-spa</main>');
     await writeFile(path.join(portalDistPath, 'index.html'), '<main>portal-spa</main>');
-    const app = createApp({ config: config({ adminDistPath, portalDistPath }), readinessChecks: readinessChecks() });
+    const app = createApp({
+      config: config({ adminDistPath, portalDistPath }),
+      readinessChecks: readinessChecks(),
+    });
 
     const admin = await request(app).get('/users/deep-link');
     const portal = await request(app).get('/portal/public/deep-link');

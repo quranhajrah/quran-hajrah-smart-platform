@@ -22,7 +22,7 @@ npm run db:seed
 npm run create:admin
 ```
 
-`db:seed` is idempotent and creates system roles and permissions only. `create:admin` has no default password and fails without explicit operator environment values.
+`db:seed` is idempotent and creates system roles, permissions, and system document categories only. `create:admin` has no default password and fails without explicit operator environment values.
 
 ## Environment
 
@@ -38,7 +38,7 @@ Hostinger documents GitHub import, Express support, selectable Node versions, en
 
 ## Backup and restoration
 
-Backups belong to the PostgreSQL provider, never the Git repository. Enable automated backups and point-in-time recovery where available. Before migration, record the current commit and create a provider snapshot. Test restoration into a separate non-production database periodically and run `/ready` plus authentication smoke tests against that restored copy.
+Backups belong to approved protected storage, never the Git repository. Enable PostgreSQL automated backups and point-in-time recovery where available. Enterprise 22 also requires encrypted backups of `DOCUMENT_STORAGE_ROOT` coordinated with the database recovery point. Before migration, record the current commit and create both recovery artifacts. Test restoration into a separate non-production environment and run `/ready`, authentication, document listing, and a controlled download against the restored copy.
 
 For an application-only regression, redeploy the last known-good commit. For a schema issue, prefer a forward migration. Database snapshot restoration is an incident operation requiring impact review; never improvise destructive SQL or commit database exports.
 

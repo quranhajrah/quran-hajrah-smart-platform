@@ -1,6 +1,6 @@
 {
   "name": "quran-hajrah-smart-platform",
-  "version": "21.0.0",
+  "version": "22.0.0",
   "private": true,
   "type": "module",
   "description": "Quran Hajrah Smart Platform monorepo",

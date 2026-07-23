@@ -25,7 +25,80 @@ const permissions = [
   ['dashboard.view', 'عرض الصفحة الرئيسية', 'dashboard'],
   ['audit.view', 'عرض سجل العمليات', 'audit'],
   ['settings.manage', 'إدارة الإعدادات', 'settings'],
+  ['documents.view', 'عرض مركز المعرفة', 'documents'],
+  ['documents.create', 'إنشاء بيانات مستند', 'documents'],
+  ['documents.update', 'تعديل بيانات المستندات', 'documents'],
+  ['documents.upload', 'رفع المستندات والإصدارات', 'documents'],
+  ['documents.download', 'تنزيل المستندات', 'documents'],
+  ['documents.archive', 'أرشفة المستندات واستعادتها', 'documents'],
+  ['documents.delete', 'حذف المستندات حذفًا منطقيًا', 'documents'],
+  ['documents.audit', 'عرض سجل تدقيق المستندات', 'documents'],
+  ['documents.manage_access', 'إدارة الوصول إلى المستندات السرية', 'documents'],
 ] as const;
+
+const categories = [
+  ['strategic-plans', 'الخطط الاستراتيجية'],
+  ['operational-plans', 'الخطط التشغيلية'],
+  ['budgets', 'الموازنات'],
+  ['policies-regulations', 'اللوائح والسياسات'],
+  ['governance-compliance', 'الحوكمة والامتثال'],
+  ['reports', 'التقارير'],
+  ['meeting-minutes', 'محاضر الاجتماعات'],
+  ['letters-correspondence', 'الخطابات والمراسلات'],
+  ['contracts', 'العقود'],
+  ['programs-initiatives', 'البرامج والمبادرات'],
+  ['education', 'الشؤون التعليمية'],
+  ['finance', 'الشؤون المالية'],
+  ['human-resources', 'الموارد البشرية'],
+  ['media-brand', 'الإعلام والهوية'],
+  ['endowments-sustainability', 'الأوقاف والاستدامة المالية'],
+  ['other', 'ملفات أخرى'],
+] as const;
+
+const documentPermissionsByRole: Record<string, string[]> = {
+  board_chair: [
+    'documents.view',
+    'documents.create',
+    'documents.update',
+    'documents.upload',
+    'documents.download',
+    'documents.archive',
+    'documents.audit',
+    'documents.manage_access',
+  ],
+  executive_director: [
+    'documents.view',
+    'documents.create',
+    'documents.update',
+    'documents.upload',
+    'documents.download',
+    'documents.archive',
+    'documents.audit',
+    'documents.manage_access',
+  ],
+  operations_manager: [
+    'documents.view',
+    'documents.create',
+    'documents.update',
+    'documents.upload',
+    'documents.download',
+    'documents.archive',
+    'documents.audit',
+  ],
+  finance_manager: ['documents.view', 'documents.create', 'documents.update', 'documents.upload', 'documents.download'],
+  education_manager: ['documents.view', 'documents.create', 'documents.update', 'documents.upload', 'documents.download'],
+  governance_officer: [
+    'documents.view',
+    'documents.create',
+    'documents.update',
+    'documents.upload',
+    'documents.download',
+    'documents.archive',
+    'documents.audit',
+  ],
+  employee: ['documents.view', 'documents.create', 'documents.upload', 'documents.download'],
+  viewer: ['documents.view', 'documents.download'],
+};
 
 async function main() {
   for (const [name, displayName] of roles) {
@@ -44,12 +117,32 @@ async function main() {
     });
   }
 
+  for (const [sortOrder, [slug, name]] of categories.entries()) {
+    await prisma.documentCategory.upsert({
+      where: { slug },
+      update: { name, sortOrder, isActive: true },
+      create: { slug, name, sortOrder, isActive: true },
+    });
+  }
+
   const superAdmin = await prisma.role.findUniqueOrThrow({ where: { name: 'super_admin' } });
   const allPermissions = await prisma.permission.findMany({ select: { id: true } });
   await prisma.rolePermission.createMany({
     data: allPermissions.map(({ id }) => ({ roleId: superAdmin.id, permissionId: id })),
     skipDuplicates: true,
   });
+
+  for (const [roleName, permissionCodes] of Object.entries(documentPermissionsByRole)) {
+    const role = await prisma.role.findUniqueOrThrow({ where: { name: roleName } });
+    const rolePermissions = await prisma.permission.findMany({
+      where: { code: { in: permissionCodes } },
+      select: { id: true },
+    });
+    await prisma.rolePermission.createMany({
+      data: rolePermissions.map(({ id }) => ({ roleId: role.id, permissionId: id })),
+      skipDuplicates: true,
+    });
+  }
 
   const viewer = await prisma.role.findUniqueOrThrow({ where: { name: 'viewer' } });
   const dashboardPermission = await prisma.permission.findUniqueOrThrow({
@@ -63,5 +156,5 @@ async function main() {
 }
 
 main()
-  .then(() => console.log('Identity roles and permissions seeded.'))
+  .then(() => console.log('Identity, document permissions, and document categories seeded.'))
   .finally(() => prisma.$disconnect());
