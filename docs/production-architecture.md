@@ -38,7 +38,7 @@ API and health routes are registered before static handling and can never fall t
 - `apps/portal/dist`
 - `packages/*/dist`
 
-`npm run deploy:production` runs the committed Prisma migrations through `DIRECT_URL`, then delegates to `npm run start:production`. The runtime command executes only `node apps/api/dist/server.js`; it does not use Vite, tsx, or ts-node. Express listens on the validated `process.env.PORT` supplied by Hostinger.
+`npm run start:production` runs the committed Prisma migrations through `DIRECT_URL` and starts `node apps/api/dist/server.js` only when migration deployment succeeds. `deploy:production` delegates to this same enforced sequence. The API runtime does not use Vite, tsx, or ts-node. Express listens on the validated `process.env.PORT` supplied by Hostinger.
 
 Admin uses `/api` by default in production, so no server environment variable is exposed through Vite. Portal is built with `/portal/` as its asset base.
 

@@ -54,12 +54,12 @@ npm run db:validate
 
 ```bash
 npm run build:production
-npm run deploy:production
+npm run start:production
 ```
 
 Hostinger may use either `npm run build:production` or `npm run build:hostinger`; both perform a clean install including devDependencies before compiling the production artifacts.
 
-`deploy:production` safely applies committed Prisma migrations through `DIRECT_URL` with `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma`, then starts the compiled server. Use `start:production` only when migrations have already been deployed by the release environment.
+`start:production` always applies committed Prisma migrations through `DIRECT_URL` with `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` before starting the compiled server. The server is not started if migration deployment fails. `deploy:production` is an alias for the same enforced sequence.
 
 Production serves admin at `/`, portal at `/portal/`, API at `/api`, liveness at `/health`, and PostgreSQL readiness at `/ready`. Configure every required environment value from `.env.example`; the production process intentionally fails when essential values are absent.
 

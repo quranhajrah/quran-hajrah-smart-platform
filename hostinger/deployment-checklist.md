@@ -16,7 +16,7 @@
 - [ ] Add a Node.js Web App in hPanel.
 - [ ] Connect the official GitHub repository and select `main`.
 - [ ] Select Node.js 20.x.
-- [ ] Configure root and build values from `README.md`, and use `npm run deploy:production` as the start command.
+- [ ] Configure root and build values from `README.md`, and use `npm run start:production` so migrations cannot be skipped.
 - [ ] Deploy and inspect build/runtime logs without copying secrets.
 - [ ] Connect `app.quran-hajrah.com` through the Node.js app dashboard.
 - [ ] Apply required DNS records and wait for propagation.
