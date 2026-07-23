@@ -38,7 +38,7 @@ API and health routes are registered before static handling and can never fall t
 - `apps/portal/dist`
 - `packages/*/dist`
 
-`npm run start:production` executes only `node apps/api/dist/server.js`. It does not use Vite, tsx, or ts-node. Express listens on the validated `process.env.PORT` supplied by Hostinger.
+`npm run deploy:production` runs the committed Prisma migrations through `DIRECT_URL`, then delegates to `npm run start:production`. The runtime command executes only `node apps/api/dist/server.js`; it does not use Vite, tsx, or ts-node. Express listens on the validated `process.env.PORT` supplied by Hostinger.
 
 Admin uses `/api` by default in production, so no server environment variable is exposed through Vite. Portal is built with `/portal/` as its asset base.
 
@@ -52,7 +52,7 @@ Refresh cookies are HttpOnly, Secure in production, configurable as SameSite Lax
 
 `DATABASE_URL` is the application connection string, while `DIRECT_URL` is the direct migration connection. `/ready` performs `SELECT 1` without returning connection details. Commands:
 
-- `npm run db:deploy` — `prisma migrate deploy`
+- `npm run db:deploy` — `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma`
 - `npm run db:status` — `prisma migrate status`
 - `npm run db:seed` — system roles and permissions only
 - `npm run db:diagnostics` — safe connectivity result without URL output

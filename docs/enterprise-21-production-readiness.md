@@ -9,10 +9,10 @@ A single Express process listens on Hostinger's `PORT`, serves `/api`, exposes l
 ```bash
 npm ci
 npm run build:production
-npm run start:production
+npm run deploy:production
 ```
 
-The start command runs compiled JavaScript only. Production database operations are deliberately separate:
+The deploy command applies committed migrations first; its runtime phase then executes compiled JavaScript only. Database operations remain available as explicit commands:
 
 ```bash
 npm run db:status
@@ -32,7 +32,7 @@ Use `.env.example` as a name checklist only. Enter real values in Hostinger hPan
 
 ## Hostinger Cloud
 
-Use the official public GitHub repository, branch `main`, Node.js 20.x, repository root, `npm run build:production`, and `npm run start:production`. The production build command performs a clean install with devDependencies before compiling through `build:artifacts`; the exact operator steps are in `hostinger/`.
+Use the official public GitHub repository, branch `main`, Node.js 20.x, repository root, `npm run build:production`, and `npm run deploy:production`. The deploy command applies committed migrations with `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` through `DIRECT_URL` before starting the compiled server. The production build command performs a clean install with devDependencies before compiling through `build:artifacts`; the exact operator steps are in `hostinger/`.
 
 Hostinger documents GitHub import, Express support, selectable Node versions, environment variables in hPanel, custom domain connection, automatic SSL after connection, and deployment/runtime logs. Relevant official links are included in the Hostinger checklists.
 
