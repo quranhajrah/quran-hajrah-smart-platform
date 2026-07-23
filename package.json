@@ -35,7 +35,8 @@
     "db:diagnostics": "npm run diagnostics -w @quran-hajrah/database",
     "db:studio": "npm run studio -w @quran-hajrah/database",
     "db:seed": "npm run seed -w @quran-hajrah/database",
-    "create:admin": "npm run create:admin -w @quran-hajrah/database"
+    "create:admin": "node packages/database/dist/create-admin.js",
+    "create:admin:dev": "npm run create:admin:dev -w @quran-hajrah/database"
   },
   "engines": {
     "node": ">=20"

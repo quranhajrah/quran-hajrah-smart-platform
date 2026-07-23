@@ -74,7 +74,17 @@ npm run db:seed
 npm run create:admin
 ```
 
-`create:admin` requires `ADMIN_EMAIL`, `ADMIN_FULL_NAME`, and `ADMIN_PASSWORD`; no default credential exists.
+`create:admin` requires `ADMIN_EMAIL` and `ADMIN_FULL_NAME`. When `ADMIN_PASSWORD` is omitted, it generates a strong temporary password and prints it once. If the email already exists, the command activates the account, rotates its password, revokes its sessions, and adds `super_admin` without creating a duplicate.
+
+First production administrator:
+
+```bash
+ADMIN_EMAIL='admin@quran-hajrah.com' \
+ADMIN_FULL_NAME='حسن محمد الزهراني' \
+npm run create:admin
+```
+
+Run this only in an approved interactive production terminal after `npm run db:seed`, capture the temporary password securely, and change it immediately after the first login. See `docs/first-production-super-administrator.md`.
 
 ## Institutional Knowledge Center
 

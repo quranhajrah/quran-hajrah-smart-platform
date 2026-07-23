@@ -1,32 +1,34 @@
-import { hash } from 'bcryptjs';
 import { database } from './index.js';
+import { generateTemporaryPassword, provisionSuperAdministrator } from './admin-provisioning.js';
 
 const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const fullName = process.env.ADMIN_FULL_NAME?.trim();
-const password = process.env.ADMIN_PASSWORD;
+const configuredPassword = process.env.ADMIN_PASSWORD;
 
-if (!email || !fullName || !password) {
-  throw new Error('ADMIN_EMAIL, ADMIN_FULL_NAME, and ADMIN_PASSWORD are required.');
+if (!email || !fullName) {
+  throw new Error('ADMIN_EMAIL and ADMIN_FULL_NAME are required.');
 }
 
-if (password.length < 12 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
-  throw new Error('ADMIN_PASSWORD does not meet the minimum password policy.');
-}
+const passwordWasGenerated = !configuredPassword;
+const password = configuredPassword || generateTemporaryPassword();
 
-const superAdmin = await database.role.findUnique({ where: { name: 'super_admin' } });
-if (!superAdmin) throw new Error('Run npm run db:seed before creating the first administrator.');
-
-const existing = await database.user.findUnique({ where: { email } });
-if (existing) throw new Error('A user with ADMIN_EMAIL already exists.');
-
-await database.user.create({
-  data: {
+try {
+  const result = await provisionSuperAdministrator(database, {
     email,
     fullName,
-    passwordHash: await hash(password, 12),
-    roles: { create: { roleId: superAdmin.id } },
-  },
-});
-
-console.log('Initial super administrator created.');
-await database.$disconnect();
+    password,
+  });
+  console.log(
+    result.outcome === 'created'
+      ? 'Initial super administrator created.'
+      : 'Existing user activated and granted the super_admin role.',
+  );
+  if (passwordWasGenerated) {
+    console.log(`TEMPORARY_ADMIN_PASSWORD=${password}`);
+    console.log(
+      'The temporary password was shown once. Store it securely and change it after login.',
+    );
+  }
+} finally {
+  await database.$disconnect();
+}

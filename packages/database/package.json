@@ -14,10 +14,11 @@
     "diagnostics": "tsx src/diagnostics.ts",
     "studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
-    "create:admin": "tsx src/create-admin.ts",
+    "create:admin": "node dist/create-admin.js",
+    "create:admin:dev": "tsx src/create-admin.ts",
     "build": "tsc",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0",

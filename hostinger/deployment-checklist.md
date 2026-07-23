@@ -10,7 +10,8 @@
 - [ ] Run `npm run db:deploy` against production; it executes `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma` through `DIRECT_URL`.
 - [ ] Run `npm run db:seed`; it idempotently creates roles, permissions, and system document categories only.
 - [ ] Provision and test the persistent non-public `DOCUMENT_STORAGE_ROOT`.
-- [ ] Run `npm run create:admin` once using temporary environment values.
+- [ ] Run `npm run create:admin` once in an interactive terminal using `ADMIN_EMAIL` and `ADMIN_FULL_NAME`; do not run it as a build/start lifecycle.
+- [ ] Capture the generated temporary password once, sign in, change it immediately, and remove temporary administrator environment values.
 
 ## Hostinger setup
 

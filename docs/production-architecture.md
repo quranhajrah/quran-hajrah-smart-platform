@@ -8,25 +8,25 @@ Hostinger currently supports Express applications and Node.js 20, 22, and 24 on 
 
 ## Development ports
 
-| Component | Development endpoint |
-| --- | --- |
-| API | `http://localhost:3000` |
-| Admin | `http://localhost:5173` |
-| Portal | `http://localhost:5174` |
+| Component | Development endpoint    |
+| --------- | ----------------------- |
+| API       | `http://localhost:3000` |
+| Admin     | `http://localhost:5173` |
+| Portal    | `http://localhost:5174` |
 
 Development uses Vite servers for admin and portal and `tsx watch` for the API.
 
 ## Production routes
 
-| Route | Handler |
-| --- | --- |
-| `/health` | Node process liveness; no database query |
-| `/ready` | PostgreSQL connectivity; returns 503 when unavailable |
-| `/api/*` | Express API and explicit JSON 404 fallback |
+| Route              | Handler                                                         |
+| ------------------ | --------------------------------------------------------------- |
+| `/health`          | Node process liveness; no database query                        |
+| `/ready`           | PostgreSQL connectivity; returns 503 when unavailable           |
+| `/api/*`           | Express API and explicit JSON 404 fallback                      |
 | `/api/documents/*` | Authenticated document metadata, files, versions, and audit API |
-| `/portal` | Permanent redirect to `/portal/` |
-| `/portal/*` | Portal static files and SPA fallback |
-| `/*` | Admin static files and SPA fallback |
+| `/portal`          | Permanent redirect to `/portal/`                                |
+| `/portal/*`        | Portal static files and SPA fallback                            |
+| `/*`               | Admin static files and SPA fallback                             |
 
 API and health routes are registered before static handling and can never fall through to an SPA. Hashed assets receive a one-year immutable cache policy. Both `index.html` files and SPA fallbacks use `Cache-Control: no-store`.
 
@@ -63,9 +63,9 @@ Refresh cookies are HttpOnly, Secure in production, configurable as SameSite Lax
 
 - `npm run db:deploy` — `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma`
 - `npm run db:status` — `prisma migrate status`
-- `npm run db:seed` — system roles and permissions only
+- `npm run db:seed` — system roles, permissions, and document categories
 - `npm run db:diagnostics` — safe connectivity result without URL output
-- `npm run create:admin` — requires explicit secure environment values
+- `npm run create:admin` — idempotent first-administrator provisioning with a generated temporary password when `ADMIN_PASSWORD` is omitted
 
 The managed Hostinger Node.js database wizard currently documents Supabase as its PostgreSQL option. Any compatible managed PostgreSQL provider may be used if it permits the required pooled and direct connections. Hostinger does not modify application database code; see the [current Node.js deployment guide](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/).
 

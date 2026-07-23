@@ -31,7 +31,8 @@ Enter values through Hostinger hPanel. Hostinger documents that deployment envir
 
 - [ ] `ADMIN_EMAIL`
 - [ ] `ADMIN_FULL_NAME`
-- [ ] `ADMIN_PASSWORD` satisfying policy
-- [ ] Remove the three administrator variables after successful creation if operationally supported
+- [ ] Leave `ADMIN_PASSWORD` unset to generate a temporary password, or set an approved value satisfying policy
+- [ ] Run the command only in an approved interactive terminal and capture generated output securely
+- [ ] Remove the administrator variables after successful creation if operationally supported
 
 Never paste secrets into build logs, GitHub issues, source files, documentation, or chat.

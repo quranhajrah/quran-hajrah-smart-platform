@@ -13,6 +13,7 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 - Added the Arabic RTL executive document dashboard, upload workflow, advanced filters, details, version history, and audit history.
 - Added idempotent seed data for 16 institutional categories and future AI contracts without external calls.
 - Added API, authorization, upload-security, storage-boundary, and interface validation coverage.
+- Made first-super-administrator provisioning idempotent and production-safe, with a one-time generated password, session revocation, and audit logging.
 
 ## [21.0.0] - 2026-07-22
 
