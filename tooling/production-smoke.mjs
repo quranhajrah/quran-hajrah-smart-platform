@@ -105,6 +105,12 @@ try {
   if (protectedDocuments.status !== 401) {
     throw new Error('Knowledge Center API did not reject anonymous access.');
   }
+  const protectedDocumentLookups = await fetch(
+    `http://127.0.0.1:${port}/api/document-lookups`,
+  );
+  if (protectedDocumentLookups.status !== 401) {
+    throw new Error('Knowledge Center lookup API did not reject anonymous access.');
+  }
   const protectedExecutive = await fetch(`http://127.0.0.1:${port}/api/executive/dashboard`);
   if (protectedExecutive.status !== 401) {
     throw new Error('Executive Intelligence API did not reject anonymous access.');

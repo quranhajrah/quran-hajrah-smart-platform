@@ -17,6 +17,7 @@ import type {
   DocumentListQuery,
   DocumentRecord,
   DocumentVersionRecord,
+  OwningDepartmentRecord,
   UpdateDocumentInput,
 } from './types.js';
 
@@ -117,21 +118,59 @@ class TestIdentityStore implements IdentityStore {
   listAudit = async () => ({ items: [], total: 0 });
 }
 
+const expectedCategoryNames = [
+  'الخطط الاستراتيجية',
+  'الخطط التشغيلية',
+  'الموازنات',
+  'اللوائح والسياسات',
+  'الحوكمة والامتثال',
+  'التقارير',
+  'محاضر الاجتماعات',
+  'الخطابات',
+  'العقود',
+  'البرامج والمبادرات',
+  'الشؤون التعليمية',
+  'الشؤون المالية',
+  'الموارد البشرية',
+  'الإعلام',
+  'الأوقاف',
+  'ملفات أخرى',
+] as const;
+
+const expectedOwningDepartmentNames = [
+  'الإدارة التنفيذية',
+  'الشؤون التعليمية',
+  'الشؤون المالية',
+  'تنمية الموارد',
+  'الحوكمة',
+  'الإعلام',
+  'الموارد البشرية',
+  'مجلس الإدارة',
+] as const;
+
 class TestDocumentStore implements DocumentStore {
-  readonly categories: DocumentCategoryRecord[] = [
-    {
+  readonly categories: DocumentCategoryRecord[] = expectedCategoryNames.map((name, sortOrder) => ({
+    id: randomUUID(),
+    name,
+    slug: `category-${sortOrder}`,
+    isActive: true,
+    sortOrder,
+  }));
+  readonly owningDepartments: OwningDepartmentRecord[] = expectedOwningDepartmentNames.map(
+    (name, sortOrder) => ({
       id: randomUUID(),
-      name: 'التقارير',
-      slug: 'reports',
+      name,
+      slug: `department-${sortOrder}`,
       isActive: true,
-      sortOrder: 0,
-    },
-  ];
+      sortOrder,
+    }),
+  );
   readonly documents: DocumentRecord[] = [];
   readonly versions: DocumentVersionRecord[] = [];
   readonly audits: DocumentAuditRecord[] = [];
 
   listCategories = async () => this.categories;
+  listOwningDepartments = async () => this.owningDepartments;
 
   async createDocument(input: CreateDocumentInput) {
     const now = new Date();
@@ -320,6 +359,42 @@ describe('Institutional Knowledge Center API', () => {
       ).status,
     ).toBe(403);
     expect((await authenticated('get', '/api/documents')).status).toBe(200);
+  });
+
+  it('returns complete non-empty Knowledge Center lookup lists', async () => {
+    const lookups = await authenticated('get', '/api/document-lookups');
+    expect(lookups.status).toBe(200);
+    expect(lookups.body.categories.map((item: { name: string }) => item.name)).toEqual([
+      ...expectedCategoryNames,
+    ]);
+    expect(lookups.body.owningDepartments.map((item: { name: string }) => item.name)).toEqual([
+      ...expectedOwningDepartmentNames,
+    ]);
+
+    const categories = await authenticated('get', '/api/document-categories');
+    const departments = await authenticated('get', '/api/owning-departments');
+    expect(categories.body).toHaveLength(16);
+    expect(departments.body).toHaveLength(8);
+  });
+
+  it('rejects document metadata outside the managed lookup lists', async () => {
+    const invalidCategory = await authenticated('post', '/api/documents').send({
+      title: 'مستند بتصنيف غير صالح',
+      categoryId: randomUUID(),
+      documentType: 'REPORT',
+      owningDepartment: expectedOwningDepartmentNames[0],
+    });
+    expect(invalidCategory.status).toBe(400);
+    expect(invalidCategory.body.error.code).toBe('INVALID_CATEGORY');
+
+    const invalidDepartment = await authenticated('post', '/api/documents').send({
+      title: 'مستند بإدارة غير صالحة',
+      categoryId: documentStore.categories[0]!.id,
+      documentType: 'REPORT',
+      owningDepartment: 'إدارة غير معتمدة',
+    });
+    expect(invalidDepartment.status).toBe(400);
+    expect(invalidDepartment.body.error.code).toBe('INVALID_OWNING_DEPARTMENT');
   });
 
   it('creates metadata without exposing storage paths and records an audit entry', async () => {

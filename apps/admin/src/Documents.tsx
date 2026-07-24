@@ -7,8 +7,10 @@ import {
   type DocumentAudit,
   type DocumentCategory,
   type DocumentDashboard,
+  type DocumentLookups,
   type DocumentRecord,
   type DocumentVersion,
+  type OwningDepartment,
 } from './api';
 import { useAuth } from './auth';
 
@@ -112,10 +114,12 @@ const emptyFilters: Filters = {
 
 function UploadDocument({
   categories,
+  owningDepartments,
   onClose,
   onUploaded,
 }: {
   categories: DocumentCategory[];
+  owningDepartments: OwningDepartment[];
   onClose(): void;
   onUploaded(document: DocumentRecord): void;
 }) {
@@ -220,7 +224,16 @@ function UploadDocument({
           </label>
           <label>
             الإدارة المالكة
-            <input name="owningDepartment" required maxLength={160} />
+            <select name="owningDepartment" required defaultValue="">
+              <option value="" disabled>
+                اختر الإدارة المالكة
+              </option>
+              {owningDepartments.map((department) => (
+                <option key={department.id} value={department.name}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             رقم المستند
@@ -303,12 +316,15 @@ export function DocumentsCenter() {
   const { can } = useAuth();
   const [dashboard, setDashboard] = useState<DocumentDashboard | null>(null);
   const [categories, setCategories] = useState<DocumentCategory[]>([]);
+  const [owningDepartments, setOwningDepartments] = useState<OwningDepartment[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [advanced, setAdvanced] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [lookupsLoading, setLookupsLoading] = useState(true);
+  const [lookupsError, setLookupsError] = useState('');
   const [error, setError] = useState('');
 
   const query = useMemo(() => {
@@ -320,17 +336,31 @@ export function DocumentsCenter() {
   }, [filters]);
 
   const loadSummary = () =>
-    Promise.all([
-      api<DocumentDashboard>('/documents/dashboard'),
-      api<DocumentCategory[]>('/document-categories'),
-    ]).then(([metrics, nextCategories]) => {
-      setDashboard(metrics);
-      setCategories(nextCategories);
-    });
+    api<DocumentDashboard>('/documents/dashboard').then((metrics) => setDashboard(metrics));
+
+  const loadLookups = useCallback(async () => {
+    setLookupsLoading(true);
+    setLookupsError('');
+    try {
+      const lookups = await api<DocumentLookups>('/document-lookups');
+      if (lookups.categories.length === 0 || lookups.owningDepartments.length === 0) {
+        throw new Error('LOOKUPS_EMPTY');
+      }
+      setCategories(lookups.categories);
+      setOwningDepartments(lookups.owningDepartments);
+    } catch {
+      setCategories([]);
+      setOwningDepartments([]);
+      setLookupsError('تعذر تحميل التصنيفات والإدارات. أعد المحاولة قبل رفع المستند.');
+    } finally {
+      setLookupsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void loadSummary().catch(() => setError('تعذر تحميل مؤشرات مركز المعرفة.'));
-  }, []);
+    void loadLookups();
+  }, [loadLookups]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -359,9 +389,22 @@ export function DocumentsCenter() {
           <p>إدارة آمنة وموحدة لوثائق الجمعية وإصداراتها.</p>
         </div>
         {can('documents.create') && (
-          <button onClick={() => setUploadOpen(true)}>+ رفع مستند</button>
+          <button
+            disabled={lookupsLoading || categories.length === 0 || owningDepartments.length === 0}
+            onClick={() => setUploadOpen(true)}
+          >
+            {lookupsLoading ? 'جارٍ تحميل القوائم…' : '+ رفع مستند'}
+          </button>
         )}
       </div>
+      {lookupsError && (
+        <div className="lookup-error">
+          <Message error>{lookupsError}</Message>
+          <button className="secondary" onClick={() => void loadLookups()}>
+            إعادة المحاولة
+          </button>
+        </div>
+      )}
 
       <div className="metrics-grid">
         <MetricCard label="إجمالي المستندات" value={dashboard?.total ?? 0} tone="metric-primary" />
@@ -561,9 +604,10 @@ export function DocumentsCenter() {
         </section>
       )}
 
-      {uploadOpen && (
+      {uploadOpen && categories.length > 0 && owningDepartments.length > 0 && (
         <UploadDocument
           categories={categories}
+          owningDepartments={owningDepartments}
           onClose={() => setUploadOpen(false)}
           onUploaded={(document) => {
             setUploadOpen(false);

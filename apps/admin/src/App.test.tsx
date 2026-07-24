@@ -124,6 +124,12 @@ describe('admin authentication flow', () => {
       slug: 'reports',
       sortOrder: 0,
     };
+    const owningDepartment = {
+      id: '31000000-0000-4000-8000-000000000001',
+      name: 'الإدارة التنفيذية',
+      slug: 'executive-management',
+      sortOrder: 0,
+    };
     const document = {
       id: '40000000-0000-4000-8000-000000000001',
       title: 'التقرير السنوي',
@@ -167,7 +173,9 @@ describe('admin authentication flow', () => {
           recent: [document],
         });
       }
-      if (url.endsWith('/document-categories')) return json([category]);
+      if (url.endsWith('/document-lookups')) {
+        return json({ categories: [category], owningDepartments: [owningDepartment] });
+      }
       if (url.includes('/documents?')) return json({ items: [document], total: 1 });
       return new Response(JSON.stringify({ error: {} }), {
         status: 404,
@@ -175,11 +183,17 @@ describe('admin authentication flow', () => {
       });
     });
     vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'مركز المعرفة المؤسسية' })).toBeTruthy();
     expect(await screen.findAllByText('التقرير السنوي')).not.toHaveLength(0);
-    expect(screen.getByRole('button', { name: '+ رفع مستند' })).toBeTruthy();
+    const uploadButton = await screen.findByRole('button', { name: '+ رفع مستند' });
+    expect(uploadButton).not.toHaveProperty('disabled', true);
+    await user.click(uploadButton);
+    expect(screen.getByLabelText('التصنيف').querySelectorAll('option')).toHaveLength(2);
+    expect(screen.getByLabelText('الإدارة المالكة').querySelectorAll('option')).toHaveLength(2);
+    expect(screen.getByRole('option', { name: 'الإدارة التنفيذية' })).toBeTruthy();
   });
 
   it('renders the executive dashboard without invented association statistics', async () => {

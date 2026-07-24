@@ -22,6 +22,17 @@ export type DocumentCategory = {
   description?: string;
   sortOrder: number;
 };
+export type OwningDepartment = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  sortOrder: number;
+};
+export type DocumentLookups = {
+  categories: DocumentCategory[];
+  owningDepartments: OwningDepartment[];
+};
 export type DocumentRecord = {
   id: string;
   title: string;

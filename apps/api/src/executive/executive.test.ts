@@ -136,6 +136,7 @@ class MemoryIdentityStore implements IdentityStore {
 const sourceDocuments: DocumentRecord[] = [];
 const documentStore: DocumentStore = {
   listCategories: async () => [],
+  listOwningDepartments: async () => [],
   createDocument: async () => {
     throw new Error('Not implemented in executive tests.');
   },

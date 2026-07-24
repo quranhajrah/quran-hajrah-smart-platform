@@ -7,6 +7,7 @@ import type {
   DocumentListQuery,
   DocumentRecord,
   DocumentVersionRecord,
+  OwningDepartmentRecord,
   StoredFileMetadata,
   UpdateDocumentInput,
 } from './types.js';
@@ -22,6 +23,7 @@ export type DashboardMetrics = {
 
 export interface DocumentStore {
   listCategories(): Promise<DocumentCategoryRecord[]>;
+  listOwningDepartments(): Promise<OwningDepartmentRecord[]>;
   createDocument(input: CreateDocumentInput): Promise<DocumentRecord>;
   findDocument(id: string): Promise<DocumentRecord | null>;
   listDocuments(

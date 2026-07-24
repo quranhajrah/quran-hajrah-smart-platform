@@ -2,6 +2,14 @@
 
 All notable changes to Quran Hajrah Smart Platform are documented here.
 
+## Unreleased
+
+### Fixed
+
+- Guaranteed the sixteen Knowledge Center categories and eight owning departments through an additive migration and the idempotent production seed.
+- Added protected category, owning-department, and combined document lookup endpoints.
+- Prevented the upload form from rendering empty required selectors and separated lookup loading from dashboard-summary loading.
+
 ## [23.0.0] - 2026-07-24
 
 ### Enterprise 23 Executive Intelligence Platform

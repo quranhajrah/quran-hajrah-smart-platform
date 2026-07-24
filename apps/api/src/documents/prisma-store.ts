@@ -124,6 +124,13 @@ export class PrismaDocumentStore implements DocumentStore {
     });
   }
 
+  listOwningDepartments() {
+    return database.owningDepartment.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
+
   async createDocument(input: CreateDocumentInput) {
     const { tags, ...data } = input;
     const document = await database.document.create({

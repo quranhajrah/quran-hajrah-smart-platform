@@ -52,6 +52,20 @@ export type DocumentCategoryRecord = {
   sortOrder: number;
 };
 
+export type OwningDepartmentRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+export type DocumentLookups = {
+  categories: DocumentCategoryRecord[];
+  owningDepartments: OwningDepartmentRecord[];
+};
+
 export type DocumentActor = { id: string; fullName: string };
 export type DocumentTagRecord = { id: string; name: string; slug: string };
 

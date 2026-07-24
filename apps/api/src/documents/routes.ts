@@ -115,12 +115,29 @@ export const createDocumentRouter = (
     limit: config.documentMaxFileSizeBytes,
   });
 
-  router.use(['/documents', '/document-categories'], authenticated);
+  router.use(
+    ['/documents', '/document-categories', '/owning-departments', '/document-lookups'],
+    authenticated,
+  );
 
   router.get(
     '/document-categories',
     requirePermission('documents.view'),
     asyncRoute(async (_request, response) => response.json(await service.listCategories())),
+  );
+
+  router.get(
+    '/owning-departments',
+    requirePermission('documents.view'),
+    asyncRoute(async (_request, response) =>
+      response.json(await service.listOwningDepartments()),
+    ),
+  );
+
+  router.get(
+    '/document-lookups',
+    requirePermission('documents.view'),
+    asyncRoute(async (_request, response) => response.json(await service.listLookups())),
   );
 
   router.get(

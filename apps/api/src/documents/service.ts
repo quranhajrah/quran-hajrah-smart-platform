@@ -33,6 +33,18 @@ export class DocumentService {
     return this.store.listCategories();
   }
 
+  listOwningDepartments() {
+    return this.store.listOwningDepartments();
+  }
+
+  async listLookups() {
+    const [categories, owningDepartments] = await Promise.all([
+      this.listCategories(),
+      this.listOwningDepartments(),
+    ]);
+    return { categories, owningDepartments };
+  }
+
   dashboard(user: IdentityUser) {
     return this.store.dashboard(accessContext(user));
   }
@@ -47,6 +59,7 @@ export class DocumentService {
     context: RequestMeta,
   ) {
     await this.ensureCategory(input.categoryId);
+    await this.ensureOwningDepartment(input.owningDepartment);
     const document = await this.store.createDocument({
       ...input,
       createdById: user.id,
@@ -92,6 +105,7 @@ export class DocumentService {
     if (current.isArchived)
       throw new AppError(409, 'Archived documents cannot be edited.', 'DOCUMENT_ARCHIVED');
     if (input.categoryId) await this.ensureCategory(input.categoryId);
+    if (input.owningDepartment) await this.ensureOwningDepartment(input.owningDepartment);
     const document = await this.store.updateDocument(id, { ...input, updatedById: user.id });
     await this.store.createAudit({
       documentId: id,
@@ -251,6 +265,20 @@ export class DocumentService {
   private async ensureCategory(id: string) {
     if (!(await this.store.listCategories()).some((category) => category.id === id)) {
       throw new AppError(400, 'Document category is invalid.', 'INVALID_CATEGORY');
+    }
+  }
+
+  private async ensureOwningDepartment(name: string) {
+    if (
+      !(await this.store.listOwningDepartments()).some(
+        (department) => department.name === name,
+      )
+    ) {
+      throw new AppError(
+        400,
+        'Owning department is invalid.',
+        'INVALID_OWNING_DEPARTMENT',
+      );
     }
   }
 }

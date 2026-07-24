@@ -12,6 +12,7 @@ The admin interface is Arabic-first and RTL at `/documents`. The API is under `/
 | --- | --- |
 | `Document` | Searchable current metadata and current-file reference |
 | `DocumentCategory` | Ordered institutional classification seeded by the platform |
+| `OwningDepartment` | Ordered owning-department lookup seeded by the platform |
 | `DocumentVersion` | Immutable metadata for every uploaded binary version |
 | `DocumentTag` | Normalized reusable document tag |
 | `DocumentTagAssignment` | Many-to-many document/tag relation |
@@ -33,15 +34,26 @@ The idempotent seed creates:
 5. الحوكمة والامتثال
 6. التقارير
 7. محاضر الاجتماعات
-8. الخطابات والمراسلات
+8. الخطابات
 9. العقود
 10. البرامج والمبادرات
 11. الشؤون التعليمية
 12. الشؤون المالية
 13. الموارد البشرية
-14. الإعلام والهوية
-15. الأوقاف والاستدامة المالية
+14. الإعلام
+15. الأوقاف
 16. ملفات أخرى
+
+The owning-department lookup contains:
+
+1. الإدارة التنفيذية
+2. الشؤون التعليمية
+3. الشؤون المالية
+4. تنمية الموارد
+5. الحوكمة
+6. الإعلام
+7. الموارد البشرية
+8. مجلس الإدارة
 
 Run `npm run db:seed` after deployment. It creates no user, administrator, password, or document.
 
@@ -52,6 +64,8 @@ All routes require a valid Bearer access token.
 | Method | Route | Permission | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/api/document-categories` | `documents.view` | Active categories |
+| `GET` | `/api/owning-departments` | `documents.view` | Active owning departments |
+| `GET` | `/api/document-lookups` | `documents.view` | Categories and owning departments for forms |
 | `GET` | `/api/documents/dashboard` | `documents.view` | Executive counters and recent uploads |
 | `GET` | `/api/documents` | `documents.view` | Paginated search and filters |
 | `POST` | `/api/documents` | `documents.create` | Create strict metadata |
@@ -67,6 +81,8 @@ All routes require a valid Bearer access token.
 | `DELETE` | `/api/documents/:id` | `documents.delete` | Soft delete |
 
 List filters: `page`, `pageSize`, `search`, `categoryId`, `documentType`, `status`, `owningDepartment`, `confidentialityLevel`, `dateFrom`, `dateTo`, and `archived`.
+
+The required categories and owning departments are committed reference data. Migration `20260724_fix_knowledge_center_lookups` inserts or repairs them safely, and `npm run db:seed` upserts the same values on every production build. The admin upload form loads `/api/document-lookups` before enabling upload and never renders empty required selectors.
 
 Binary upload uses the actual MIME type in `Content-Type` and a URI-encoded original name in `X-File-Name`. New versions may include `X-Version-Notes`. JSON and binaries are intentionally separate so metadata remains strictly validated and file bodies receive an independent size limit.
 

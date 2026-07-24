@@ -63,15 +63,26 @@ const categories = [
   ['governance-compliance', 'الحوكمة والامتثال'],
   ['reports', 'التقارير'],
   ['meeting-minutes', 'محاضر الاجتماعات'],
-  ['letters-correspondence', 'الخطابات والمراسلات'],
+  ['letters-correspondence', 'الخطابات'],
   ['contracts', 'العقود'],
   ['programs-initiatives', 'البرامج والمبادرات'],
   ['education', 'الشؤون التعليمية'],
   ['finance', 'الشؤون المالية'],
   ['human-resources', 'الموارد البشرية'],
-  ['media-brand', 'الإعلام والهوية'],
-  ['endowments-sustainability', 'الأوقاف والاستدامة المالية'],
+  ['media-brand', 'الإعلام'],
+  ['endowments-sustainability', 'الأوقاف'],
   ['other', 'ملفات أخرى'],
+] as const;
+
+const owningDepartments = [
+  ['executive-management', 'الإدارة التنفيذية'],
+  ['education-affairs', 'الشؤون التعليمية'],
+  ['finance-affairs', 'الشؤون المالية'],
+  ['resource-development', 'تنمية الموارد'],
+  ['governance', 'الحوكمة'],
+  ['media', 'الإعلام'],
+  ['human-resources', 'الموارد البشرية'],
+  ['board-of-directors', 'مجلس الإدارة'],
 ] as const;
 
 const documentPermissionsByRole: Record<string, string[]> = {
@@ -245,6 +256,14 @@ async function main() {
     });
   }
 
+  for (const [sortOrder, [slug, name]] of owningDepartments.entries()) {
+    await prisma.owningDepartment.upsert({
+      where: { slug },
+      update: { name, sortOrder, isActive: true },
+      create: { slug, name, sortOrder, isActive: true },
+    });
+  }
+
   const superAdmin = await prisma.role.findUniqueOrThrow({ where: { name: 'super_admin' } });
   const allPermissions = await prisma.permission.findMany({ select: { id: true } });
   await prisma.rolePermission.createMany({
@@ -331,7 +350,7 @@ async function main() {
 main()
   .then(() =>
     console.log(
-      'Identity, document, and executive permissions, categories, metric definitions, and dashboard defaults seeded.',
+      'Identity, document, and executive permissions, document lookups, metric definitions, and dashboard defaults seeded.',
     ),
   )
   .finally(() => prisma.$disconnect());
