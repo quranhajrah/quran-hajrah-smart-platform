@@ -3,6 +3,16 @@ import { BrowserRouter, Navigate, NavLink, Route, Routes, useNavigate } from 're
 import { api, type Role, type User } from './api';
 import { AuthProvider, useAuth } from './auth';
 import { DocumentDetails, DocumentsCenter } from './Documents';
+import {
+  AlertsCenter,
+  DashboardPreferences,
+  ExecutiveDashboard,
+  ExecutiveDetail,
+  ExecutiveHealthPage,
+  ExecutiveRegistry,
+  RiskHeatMatrix,
+} from './Executive';
+import { entityDefinitions } from './executive-config';
 
 function Guard({ children, permission }: { children: ReactNode; permission?: string }) {
   const { user, loading, can } = useAuth();
@@ -70,7 +80,14 @@ function Layout({ children }: { children: ReactNode }) {
           <strong>قرآن الهجرة</strong>
         </div>
         <nav>
-          <NavLink to="/">الرئيسية</NavLink>
+          {can('dashboard.view') && <NavLink to="/">القيادة التنفيذية</NavLink>}
+          {can('metrics.view') && <NavLink to="/executive/metrics">المؤشرات المؤسسية</NavLink>}
+          {can('strategy.view') && <NavLink to="/executive/objectives">الاستراتيجية</NavLink>}
+          {can('kpi.view') && <NavLink to="/executive/kpis">مؤشرات الأداء</NavLink>}
+          {can('initiatives.view') && <NavLink to="/executive/initiatives">المبادرات</NavLink>}
+          {can('risks.view') && <NavLink to="/executive/risks">المخاطر</NavLink>}
+          {can('alerts.view') && <NavLink to="/executive/alerts">التنبيهات</NavLink>}
+          {can('reports.view') && <NavLink to="/executive/reports">التقارير التنفيذية</NavLink>}
           {can('documents.view') && <NavLink to="/documents">مركز المعرفة</NavLink>}
           <NavLink to="/account">حسابي</NavLink>
           {can('users.view') && <NavLink to="/users">المستخدمون</NavLink>}
@@ -102,23 +119,6 @@ function Page({ title, children }: { title: string; children: ReactNode }) {
       </div>
       {children}
     </section>
-  );
-}
-
-function Welcome() {
-  const { can } = useAuth();
-  return (
-    <Page title="مرحبًا بك">
-      <div className="welcome">
-        <h2>منصة الإدارة المؤسسية</h2>
-        <p>اختر من القائمة للوصول إلى الخدمات المتاحة لك.</p>
-        {can('documents.view') && (
-          <NavLink className="welcome-action" to="/documents">
-            فتح مركز المعرفة المؤسسية
-          </NavLink>
-        )}
-      </div>
-    </Page>
   );
 }
 
@@ -340,8 +340,62 @@ export default function App() {
           <Route
             path="/"
             element={
-              <ProtectedPage>
-                <Welcome />
+              <ProtectedPage permission="dashboard.view">
+                <ExecutiveDashboard />
+              </ProtectedPage>
+            }
+          />
+          {Object.values(entityDefinitions).map((definition) => (
+            <Route
+              key={definition.key}
+              path={`/executive/${definition.key}`}
+              element={
+                <ProtectedPage permission={definition.permission}>
+                  <ExecutiveRegistry definition={definition} />
+                </ProtectedPage>
+              }
+            />
+          ))}
+          {Object.values(entityDefinitions).map((definition) => (
+            <Route
+              key={`${definition.key}-detail`}
+              path={`/executive/${definition.key}/:id`}
+              element={
+                <ProtectedPage permission={definition.permission}>
+                  <ExecutiveDetail entity={definition.key} />
+                </ProtectedPage>
+              }
+            />
+          ))}
+          <Route
+            path="/executive/risks/heat-matrix"
+            element={
+              <ProtectedPage permission="risks.view">
+                <RiskHeatMatrix />
+              </ProtectedPage>
+            }
+          />
+          <Route
+            path="/executive/alerts"
+            element={
+              <ProtectedPage permission="alerts.view">
+                <AlertsCenter />
+              </ProtectedPage>
+            }
+          />
+          <Route
+            path="/executive/health"
+            element={
+              <ProtectedPage permission="dashboard.view">
+                <ExecutiveHealthPage />
+              </ProtectedPage>
+            }
+          />
+          <Route
+            path="/executive/preferences"
+            element={
+              <ProtectedPage permission="dashboard.configure">
+                <DashboardPreferences />
               </ProtectedPage>
             }
           />

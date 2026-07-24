@@ -20,6 +20,9 @@ import { PrismaDocumentStore } from './documents/prisma-store.js';
 import { createDocumentRouter } from './documents/routes.js';
 import { LocalStorageProvider, type StorageProvider } from './documents/storage.js';
 import type { DocumentStore } from './documents/store.js';
+import { PrismaExecutiveStore } from './executive/prisma-store.js';
+import { createExecutiveRouter } from './executive/routes.js';
+import type { ExecutiveStore } from './executive/store.js';
 
 export type AppDependencies = {
   store?: IdentityStore;
@@ -28,6 +31,7 @@ export type AppDependencies = {
   logger?: Logger;
   documentStore?: DocumentStore;
   storage?: StorageProvider;
+  executiveStore?: ExecutiveStore;
 };
 
 export type ReadinessChecks = {
@@ -63,6 +67,7 @@ export const createApp = (dependencies: AppDependencies = {}) => {
   const logger = dependencies.logger ?? createLogger(config.logLevel);
   const documentStore = dependencies.documentStore ?? new PrismaDocumentStore();
   const storage = dependencies.storage ?? new LocalStorageProvider(config.documentStorageRoot);
+  const executiveStore = dependencies.executiveStore ?? new PrismaExecutiveStore();
   const app = express();
 
   app.disable('x-powered-by');
@@ -151,6 +156,7 @@ export const createApp = (dependencies: AppDependencies = {}) => {
   });
 
   app.use('/api', createDocumentRouter(store, documentStore, storage, config));
+  app.use('/api', createExecutiveRouter(store, documentStore, executiveStore, config));
   app.use('/api', createIdentityRouter(store, config));
   app.use('/api', (_request, _response, next) =>
     next(new AppError(404, 'API route not found.', 'NOT_FOUND')),

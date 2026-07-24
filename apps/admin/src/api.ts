@@ -78,6 +78,85 @@ export type DocumentDashboard = {
   archived: number;
   recent: DocumentRecord[];
 };
+export type ExecutiveRecord = {
+  id: string;
+  [key: string]: unknown;
+};
+export type PageResult<T = ExecutiveRecord> = {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+export type ExecutiveHealth = {
+  score: number | null;
+  coverage: number;
+  rating: string | null;
+  components: Array<{
+    key: string;
+    label: string;
+    weight: number;
+    score: number | null;
+    contribution: number | null;
+    missing: boolean;
+    explanation: string;
+  }>;
+  missingData: string[];
+  explanation: string;
+  history?: ExecutiveRecord[];
+};
+export type ExecutiveDashboard = {
+  summary: {
+    documents: {
+      total: number;
+      active: number;
+      underReview: number;
+      expiring: number;
+      archived: number;
+    };
+    activeUsers: number;
+    recentSystemActivity: number;
+    objectives: { total: number; averageProgress: number | null };
+    kpis: Record<string, number>;
+    initiatives: {
+      total: number;
+      active: number;
+      delayed: number;
+      atRisk: number;
+      completed: number;
+      plannedBudget: number;
+      actualSpending: number;
+      budgetVariance: { amount: number; percentage: number | null };
+    };
+    risks: { open: number; critical: number; averageResidualScore: number | null };
+  };
+  associationIndicators: Record<
+    string,
+    {
+      id: string;
+      nameAr: string;
+      value: number | string | null;
+      unit: string | null;
+      measuredAt: string | null;
+    } | null
+  >;
+  institutionalMetrics: Record<
+    string,
+    {
+      id: string;
+      nameAr: string;
+      value: number | string | null;
+      unit: string | null;
+      measuredAt: string | null;
+    }
+  >;
+  health: ExecutiveHealth;
+  recentDocuments: DocumentRecord[];
+  recentActivities: ExecutiveRecord[];
+  alerts: ExecutiveRecord[];
+  upcomingDeadlines: ExecutiveRecord[];
+  quickActions: string[];
+};
 
 const baseUrl =
   import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '/api' : 'http://localhost:3000/api');
@@ -139,4 +218,16 @@ export async function downloadDocument(document: DocumentRecord) {
   anchor.download = document.originalFileName || `${document.title}.bin`;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+export async function openExecutiveReportPrint(reportId: string) {
+  const response = await fetch(`${baseUrl}/executive/reports/${reportId}/print`, {
+    credentials: 'include',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  });
+  if (!response.ok) throw new Error('تعذر فتح عرض التقرير.');
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

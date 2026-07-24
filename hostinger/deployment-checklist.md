@@ -41,5 +41,11 @@
 - [ ] Confirm runtime logs are structured and contain no credentials.
 - [ ] Open the Knowledge Center, upload an approved test PDF, download it, add a version, archive it, restore it, and verify its audit history.
 - [ ] Confirm binary files persist after a controlled redeploy.
+- [ ] Confirm migration `20260724_enterprise_23_executive_intelligence` is applied in the build log.
+- [ ] Confirm the authenticated landing route displays the Executive Dashboard without fabricated values.
+- [ ] Verify server-side RBAC denial with a read-only role and allow the same action with an authorized executive role.
+- [ ] Create and verify one approved acceptance metric measurement, KPI, initiative, risk, alert, and report.
+- [ ] Verify report generation and approval require distinct permissions and all six acceptance actions appear in the audit log.
+- [ ] If scheduling alerts, run `npm run executive:alerts` once, confirm idempotency, and only then configure the approved Hostinger schedule.
 
-Do not mark production successful until DNS, SSL, readiness, database migration, and login are all verified on the real domain.
+Do not mark Enterprise 23 production successful until DNS, SSL, readiness, database migration, login, dashboard, RBAC, and the six production acceptance records are verified on the real domain.

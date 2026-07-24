@@ -83,6 +83,11 @@ try {
   if (knowledgeCenter.status !== 200 || !knowledgeCenterHtml.includes('id="root"')) {
     throw new Error('Knowledge Center SPA fallback failed.');
   }
+  const executiveDashboard = await fetch(`http://127.0.0.1:${port}/executive/metrics`);
+  const executiveDashboardHtml = await executiveDashboard.text();
+  if (executiveDashboard.status !== 200 || !executiveDashboardHtml.includes('id="root"')) {
+    throw new Error('Enterprise 23 admin SPA fallback failed.');
+  }
 
   const portal = await fetch(`http://127.0.0.1:${port}/portal/`, { redirect: 'manual' });
   const portalHtml = await portal.text();
@@ -99,6 +104,10 @@ try {
   const protectedDocuments = await fetch(`http://127.0.0.1:${port}/api/documents`);
   if (protectedDocuments.status !== 401) {
     throw new Error('Knowledge Center API did not reject anonymous access.');
+  }
+  const protectedExecutive = await fetch(`http://127.0.0.1:${port}/api/executive/dashboard`);
+  if (protectedExecutive.status !== 401) {
+    throw new Error('Executive Intelligence API did not reject anonymous access.');
   }
 
   const missingApi = await fetch(`http://127.0.0.1:${port}/api/not-a-route`);
@@ -137,7 +146,7 @@ try {
   }
 
   console.log(
-    'Production runtime, logs, health, readiness, SPAs, Knowledge Center, static assets, and protected routes passed.',
+    'Production runtime, logs, health, readiness, SPAs, Knowledge Center, Executive Intelligence, static assets, and protected routes passed.',
   );
 } finally {
   child.kill('SIGTERM');

@@ -9,27 +9,68 @@ datasource db {
 }
 
 model User {
-  id                         String               @id @default(uuid()) @db.Uuid
-  fullName                   String
-  email                      String               @unique
-  passwordHash               String
-  phone                      String?
-  jobTitle                   String?
-  isActive                   Boolean              @default(true)
-  lastLoginAt                DateTime?
-  createdAt                  DateTime             @default(now())
-  updatedAt                  DateTime             @updatedAt
-  roles                      UserRole[]           @relation("UserRoles")
-  roleAssignments            UserRole[]           @relation("AssignedBy")
-  refreshTokens              RefreshToken[]
-  auditLogs                  AuditLog[]
-  documentsCreated           Document[]           @relation("DocumentCreatedBy")
-  documentsUpdated           Document[]           @relation("DocumentUpdatedBy")
-  documentsDeleted           Document[]           @relation("DocumentDeletedBy")
-  documentVersions           DocumentVersion[]    @relation("DocumentVersionCreatedBy")
-  documentAccessRules        DocumentAccessRule[] @relation("DocumentAccessUser")
-  documentAccessRulesCreated DocumentAccessRule[] @relation("DocumentAccessCreatedBy")
-  documentAuditLogs          DocumentAuditLog[]
+  id                          String                         @id @default(uuid()) @db.Uuid
+  fullName                    String
+  email                       String                         @unique
+  passwordHash                String
+  phone                       String?
+  jobTitle                    String?
+  isActive                    Boolean                        @default(true)
+  lastLoginAt                 DateTime?
+  createdAt                   DateTime                       @default(now())
+  updatedAt                   DateTime                       @updatedAt
+  roles                       UserRole[]                     @relation("UserRoles")
+  roleAssignments             UserRole[]                     @relation("AssignedBy")
+  refreshTokens               RefreshToken[]
+  auditLogs                   AuditLog[]
+  documentsCreated            Document[]                     @relation("DocumentCreatedBy")
+  documentsUpdated            Document[]                     @relation("DocumentUpdatedBy")
+  documentsDeleted            Document[]                     @relation("DocumentDeletedBy")
+  documentVersions            DocumentVersion[]              @relation("DocumentVersionCreatedBy")
+  documentAccessRules         DocumentAccessRule[]           @relation("DocumentAccessUser")
+  documentAccessRulesCreated  DocumentAccessRule[]           @relation("DocumentAccessCreatedBy")
+  documentAuditLogs           DocumentAuditLog[]
+  metricsCreated              InstitutionalMetric[]          @relation("MetricCreatedBy")
+  metricsUpdated              InstitutionalMetric[]          @relation("MetricUpdatedBy")
+  metricValuesCreated         MetricValue[]                  @relation("MetricValueCreatedBy")
+  objectivesOwned             StrategicObjective[]           @relation("ObjectiveOwner")
+  objectivesCreated           StrategicObjective[]           @relation("ObjectiveCreatedBy")
+  objectivesUpdated           StrategicObjective[]           @relation("ObjectiveUpdatedBy")
+  kpisOwned                   StrategicKpi[]                 @relation("KpiOwner")
+  kpisCreated                 StrategicKpi[]                 @relation("KpiCreatedBy")
+  kpisUpdated                 StrategicKpi[]                 @relation("KpiUpdatedBy")
+  kpiMeasurementsCreated      KpiMeasurement[]               @relation("KpiMeasurementCreatedBy")
+  initiativesOwned            OperationalInitiative[]        @relation("InitiativeOwner")
+  initiativesCreated          OperationalInitiative[]        @relation("InitiativeCreatedBy")
+  initiativesUpdated          OperationalInitiative[]        @relation("InitiativeUpdatedBy")
+  milestonesCreated           InitiativeMilestone[]          @relation("MilestoneCreatedBy")
+  milestonesUpdated           InitiativeMilestone[]          @relation("MilestoneUpdatedBy")
+  initiativeUpdatesCreated    InitiativeUpdate[]             @relation("InitiativeUpdateCreatedBy")
+  initiativeUpdatesUpdated    InitiativeUpdate[]             @relation("InitiativeUpdateUpdatedBy")
+  initiativeEvidenceAdded     InitiativeEvidence[]           @relation("InitiativeEvidenceAddedBy")
+  risksOwned                  InstitutionalRisk[]            @relation("RiskOwner")
+  risksCreated                InstitutionalRisk[]            @relation("RiskCreatedBy")
+  risksUpdated                InstitutionalRisk[]            @relation("RiskUpdatedBy")
+  riskTreatmentsOwned         RiskTreatment[]                @relation("RiskTreatmentOwner")
+  riskTreatmentsCreated       RiskTreatment[]                @relation("RiskTreatmentCreatedBy")
+  riskTreatmentsUpdated       RiskTreatment[]                @relation("RiskTreatmentUpdatedBy")
+  riskEvidenceAdded           RiskEvidence[]                 @relation("RiskEvidenceAddedBy")
+  executiveAlertsAssigned     ExecutiveAlert[]               @relation("AlertAssignedUser")
+  executiveAlertsCreated      ExecutiveAlert[]               @relation("AlertCreatedBy")
+  executiveAlertsUpdated      ExecutiveAlert[]               @relation("AlertUpdatedBy")
+  executiveAlertsAcknowledged ExecutiveAlert[]               @relation("AlertAcknowledgedBy")
+  executiveAlertsResolved     ExecutiveAlert[]               @relation("AlertResolvedBy")
+  executiveAlertsDismissed    ExecutiveAlert[]               @relation("AlertDismissedBy")
+  dashboardPreferences        ExecutiveDashboardPreference[] @relation("DashboardPreferenceUser")
+  dashboardPreferencesCreated ExecutiveDashboardPreference[] @relation("DashboardPreferenceCreatedBy")
+  dashboardPreferencesUpdated ExecutiveDashboardPreference[] @relation("DashboardPreferenceUpdatedBy")
+  healthSnapshotsCreated      ExecutiveHealthSnapshot[]      @relation("HealthSnapshotCreatedBy")
+  executiveReportsPrepared    ExecutiveReport[]              @relation("ExecutiveReportPreparedBy")
+  executiveReportsApproved    ExecutiveReport[]              @relation("ExecutiveReportApprovedBy")
+  executiveReportsCreated     ExecutiveReport[]              @relation("ExecutiveReportCreatedBy")
+  executiveReportsUpdated     ExecutiveReport[]              @relation("ExecutiveReportUpdatedBy")
+  reportSectionsCreated       ExecutiveReportSection[]       @relation("ReportSectionCreatedBy")
+  reportSectionsUpdated       ExecutiveReportSection[]       @relation("ReportSectionUpdatedBy")
 
   @@index([isActive])
   @@index([createdAt])
@@ -212,6 +253,10 @@ model Document {
   tags                 DocumentTagAssignment[]
   accessRules          DocumentAccessRule[]
   auditLogs            DocumentAuditLog[]
+  metricValues         MetricValue[]
+  kpiMeasurements      KpiMeasurement[]
+  initiativeEvidence   InitiativeEvidence[]
+  riskEvidence         RiskEvidence[]
 
   @@index([categoryId, status])
   @@index([documentType, status])
@@ -309,4 +354,559 @@ model DocumentAuditLog {
   @@index([userId, createdAt])
   @@index([action, createdAt])
   @@index([versionId])
+}
+
+enum MetricDataType {
+  NUMBER
+  PERCENTAGE
+  CURRENCY
+  TEXT
+}
+
+enum MetricFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  ON_DEMAND
+}
+
+enum KpiStatus {
+  NOT_STARTED
+  ON_TRACK
+  AT_RISK
+  OFF_TRACK
+  COMPLETED
+}
+
+enum InitiativeStatus {
+  PLANNED
+  ACTIVE
+  AT_RISK
+  DELAYED
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum RiskLikelihood {
+  RARE
+  UNLIKELY
+  POSSIBLE
+  LIKELY
+  ALMOST_CERTAIN
+}
+
+enum RiskImpact {
+  INSIGNIFICANT
+  MINOR
+  MODERATE
+  MAJOR
+  SEVERE
+}
+
+enum RiskStatus {
+  OPEN
+  UNDER_TREATMENT
+  ACCEPTED
+  CLOSED
+}
+
+enum AlertSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum ExecutiveReportStatus {
+  DRAFT
+  GENERATED
+  APPROVED
+  ARCHIVED
+}
+
+enum ExecutiveReportType {
+  BOARD
+  MONTHLY_PERFORMANCE
+  QUARTERLY_PERFORMANCE
+  OPERATIONAL_PLAN
+  RISKS
+  GOVERNANCE
+  KNOWLEDGE_CENTER
+  COMPREHENSIVE
+}
+
+model InstitutionalMetric {
+  id                    String          @id @default(uuid()) @db.Uuid
+  key                   String          @unique
+  nameAr                String
+  description           String?
+  unit                  String?
+  dataType              MetricDataType
+  frequency             MetricFrequency
+  responsibleDepartment String?
+  targetValue           Decimal?        @db.Decimal(18, 4)
+  warningThreshold      Decimal?        @db.Decimal(18, 4)
+  criticalThreshold     Decimal?        @db.Decimal(18, 4)
+  currentNumericValue   Decimal?        @db.Decimal(18, 4)
+  currentTextValue      String?
+  currentMeasuredAt     DateTime?
+  sourceType            String?
+  higherIsBetter        Boolean         @default(true)
+  isActive              Boolean         @default(true)
+  createdById           String?         @db.Uuid
+  updatedById           String?         @db.Uuid
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  deletedAt             DateTime?
+  createdBy             User?           @relation("MetricCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy             User?           @relation("MetricUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  values                MetricValue[]
+
+  @@index([isActive, deletedAt])
+  @@index([responsibleDepartment])
+  @@index([currentMeasuredAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model MetricValue {
+  id               String              @id @default(uuid()) @db.Uuid
+  metricId         String              @db.Uuid
+  numericValue     Decimal?            @db.Decimal(18, 4)
+  textValue        String?
+  measuredAt       DateTime
+  sourceType       String?
+  sourceDocumentId String?             @db.Uuid
+  notes            String?
+  createdById      String              @db.Uuid
+  createdAt        DateTime            @default(now())
+  deletedAt        DateTime?
+  metric           InstitutionalMetric @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  sourceDocument   Document?           @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  createdBy        User                @relation("MetricValueCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([metricId, measuredAt])
+  @@index([sourceDocumentId])
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+model StrategicObjective {
+  id            String                  @id @default(uuid()) @db.Uuid
+  code          String                  @unique
+  title         String
+  description   String?
+  strategicAxis String
+  baseline      Decimal?                @db.Decimal(18, 4)
+  target        Decimal?                @db.Decimal(18, 4)
+  startDate     DateTime                @db.Date
+  endDate       DateTime                @db.Date
+  ownerId       String?                 @db.Uuid
+  status        KpiStatus               @default(NOT_STARTED)
+  weight        Decimal                 @default(0) @db.Decimal(5, 2)
+  progress      Decimal                 @default(0) @db.Decimal(5, 2)
+  createdById   String                  @db.Uuid
+  updatedById   String                  @db.Uuid
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  deletedAt     DateTime?
+  owner         User?                   @relation("ObjectiveOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy     User                    @relation("ObjectiveCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy     User                    @relation("ObjectiveUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  kpis          StrategicKpi[]
+  initiatives   OperationalInitiative[]
+  risks         InstitutionalRisk[]
+
+  @@index([strategicAxis, status])
+  @@index([ownerId, status])
+  @@index([startDate, endDate])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model StrategicKpi {
+  id           String             @id @default(uuid()) @db.Uuid
+  objectiveId  String             @db.Uuid
+  code         String             @unique
+  title        String
+  description  String?
+  formula      String?
+  baseline     Decimal?           @db.Decimal(18, 4)
+  target       Decimal            @db.Decimal(18, 4)
+  currentValue Decimal?           @db.Decimal(18, 4)
+  unit         String?
+  frequency    MetricFrequency
+  ownerId      String?            @db.Uuid
+  dataSource   String?
+  status       KpiStatus          @default(NOT_STARTED)
+  weight       Decimal            @default(0) @db.Decimal(5, 2)
+  createdById  String             @db.Uuid
+  updatedById  String             @db.Uuid
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+  objective    StrategicObjective @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+  owner        User?              @relation("KpiOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy    User               @relation("KpiCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User               @relation("KpiUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  measurements KpiMeasurement[]
+
+  @@index([objectiveId, status])
+  @@index([ownerId, status])
+  @@index([frequency, status])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model KpiMeasurement {
+  id               String       @id @default(uuid()) @db.Uuid
+  kpiId            String       @db.Uuid
+  value            Decimal      @db.Decimal(18, 4)
+  measuredAt       DateTime
+  notes            String?
+  sourceDocumentId String?      @db.Uuid
+  createdById      String       @db.Uuid
+  createdAt        DateTime     @default(now())
+  deletedAt        DateTime?
+  kpi              StrategicKpi @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  sourceDocument   Document?    @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  createdBy        User         @relation("KpiMeasurementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([kpiId, measuredAt])
+  @@index([sourceDocumentId])
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+model OperationalInitiative {
+  id                String                @id @default(uuid()) @db.Uuid
+  code              String                @unique
+  name              String
+  description       String?
+  objectiveId       String?               @db.Uuid
+  department        String
+  ownerId           String?               @db.Uuid
+  startDate         DateTime              @db.Date
+  endDate           DateTime              @db.Date
+  budget            Decimal               @default(0) @db.Decimal(18, 2)
+  actualSpending    Decimal               @default(0) @db.Decimal(18, 2)
+  progress          Decimal               @default(0) @db.Decimal(5, 2)
+  status            InitiativeStatus      @default(PLANNED)
+  createdById       String                @db.Uuid
+  updatedById       String                @db.Uuid
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  deletedAt         DateTime?
+  objective         StrategicObjective?   @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  owner             User?                 @relation("InitiativeOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy         User                  @relation("InitiativeCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy         User                  @relation("InitiativeUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  milestones        InitiativeMilestone[]
+  updates           InitiativeUpdate[]
+  risks             InstitutionalRisk[]
+  evidenceDocuments InitiativeEvidence[]
+
+  @@index([objectiveId, status])
+  @@index([department, status])
+  @@index([ownerId, status])
+  @@index([startDate, endDate])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model InitiativeMilestone {
+  id           String                @id @default(uuid()) @db.Uuid
+  initiativeId String                @db.Uuid
+  title        String
+  description  String?
+  dueDate      DateTime              @db.Date
+  completedAt  DateTime?
+  progress     Decimal               @default(0) @db.Decimal(5, 2)
+  status       KpiStatus             @default(NOT_STARTED)
+  createdById  String                @db.Uuid
+  updatedById  String                @db.Uuid
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  deletedAt    DateTime?
+  initiative   OperationalInitiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  createdBy    User                  @relation("MilestoneCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User                  @relation("MilestoneUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([initiativeId, dueDate])
+  @@index([status, dueDate])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model InitiativeUpdate {
+  id             String                @id @default(uuid()) @db.Uuid
+  initiativeId   String                @db.Uuid
+  summary        String
+  progress       Decimal               @db.Decimal(5, 2)
+  status         InitiativeStatus
+  actualSpending Decimal?              @db.Decimal(18, 2)
+  updateDate     DateTime              @db.Date
+  createdById    String                @db.Uuid
+  updatedById    String                @db.Uuid
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  deletedAt      DateTime?
+  initiative     OperationalInitiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  createdBy      User                  @relation("InitiativeUpdateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy      User                  @relation("InitiativeUpdateUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([initiativeId, updateDate])
+  @@index([status, updateDate])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model InitiativeEvidence {
+  initiativeId String                @db.Uuid
+  documentId   String                @db.Uuid
+  addedById    String                @db.Uuid
+  createdAt    DateTime              @default(now())
+  initiative   OperationalInitiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  document     Document              @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  addedBy      User                  @relation("InitiativeEvidenceAddedBy", fields: [addedById], references: [id], onDelete: Restrict)
+
+  @@id([initiativeId, documentId])
+  @@index([documentId])
+  @@index([addedById])
+}
+
+model InstitutionalRisk {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  code               String                 @unique
+  title              String
+  description        String?
+  category           String
+  cause              String?
+  consequence        String?
+  likelihood         RiskLikelihood
+  impact             RiskImpact
+  inherentScore      Int
+  existingControls   String?
+  residualLikelihood RiskLikelihood
+  residualImpact     RiskImpact
+  residualScore      Int
+  ownerId            String?                @db.Uuid
+  status             RiskStatus             @default(OPEN)
+  dueDate            DateTime?              @db.Date
+  reviewDate         DateTime?              @db.Date
+  objectiveId        String?                @db.Uuid
+  initiativeId       String?                @db.Uuid
+  createdById        String                 @db.Uuid
+  updatedById        String                 @db.Uuid
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  deletedAt          DateTime?
+  owner              User?                  @relation("RiskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  objective          StrategicObjective?    @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  initiative         OperationalInitiative? @relation(fields: [initiativeId], references: [id], onDelete: SetNull)
+  createdBy          User                   @relation("RiskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy          User                   @relation("RiskUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  treatments         RiskTreatment[]
+  evidenceDocuments  RiskEvidence[]
+
+  @@index([status, residualScore])
+  @@index([category, status])
+  @@index([ownerId, status])
+  @@index([objectiveId])
+  @@index([initiativeId])
+  @@index([dueDate])
+  @@index([reviewDate])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model RiskTreatment {
+  id          String            @id @default(uuid()) @db.Uuid
+  riskId      String            @db.Uuid
+  title       String
+  description String?
+  ownerId     String?           @db.Uuid
+  dueDate     DateTime          @db.Date
+  completedAt DateTime?
+  progress    Decimal           @default(0) @db.Decimal(5, 2)
+  status      KpiStatus         @default(NOT_STARTED)
+  createdById String            @db.Uuid
+  updatedById String            @db.Uuid
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+  risk        InstitutionalRisk @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  owner       User?             @relation("RiskTreatmentOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy   User              @relation("RiskTreatmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy   User              @relation("RiskTreatmentUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([riskId, status])
+  @@index([ownerId, status])
+  @@index([dueDate, status])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model RiskEvidence {
+  riskId     String            @db.Uuid
+  documentId String            @db.Uuid
+  addedById  String            @db.Uuid
+  createdAt  DateTime          @default(now())
+  risk       InstitutionalRisk @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  document   Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  addedBy    User              @relation("RiskEvidenceAddedBy", fields: [addedById], references: [id], onDelete: Restrict)
+
+  @@id([riskId, documentId])
+  @@index([documentId])
+  @@index([addedById])
+}
+
+model ExecutiveAlert {
+  id               String        @id @default(uuid()) @db.Uuid
+  severity         AlertSeverity
+  status           AlertStatus   @default(OPEN)
+  title            String
+  description      String
+  sourceModule     String
+  sourceRecordId   String?
+  fingerprint      String?       @unique
+  dueDate          DateTime?
+  assignedUserId   String?       @db.Uuid
+  acknowledgedAt   DateTime?
+  acknowledgedById String?       @db.Uuid
+  resolvedAt       DateTime?
+  resolvedById     String?       @db.Uuid
+  dismissedAt      DateTime?
+  dismissedById    String?       @db.Uuid
+  isAutoGenerated  Boolean       @default(false)
+  createdById      String?       @db.Uuid
+  updatedById      String?       @db.Uuid
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+  assignedUser     User?         @relation("AlertAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  acknowledgedBy   User?         @relation("AlertAcknowledgedBy", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+  resolvedBy       User?         @relation("AlertResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  dismissedBy      User?         @relation("AlertDismissedBy", fields: [dismissedById], references: [id], onDelete: SetNull)
+  createdBy        User?         @relation("AlertCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy        User?         @relation("AlertUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([status, severity])
+  @@index([sourceModule, sourceRecordId])
+  @@index([assignedUserId, status])
+  @@index([dueDate, status])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model ExecutiveDashboardPreference {
+  id            String    @id @default(uuid()) @db.Uuid
+  key           String    @unique
+  userId        String?   @unique @db.Uuid
+  healthWeights Json
+  layout        Json?
+  quickActions  String[]  @default([])
+  isDefault     Boolean   @default(false)
+  createdById   String?   @db.Uuid
+  updatedById   String?   @db.Uuid
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  user          User?     @relation("DashboardPreferenceUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy     User?     @relation("DashboardPreferenceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy     User?     @relation("DashboardPreferenceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([isDefault, deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model ExecutiveHealthSnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  score       Decimal? @db.Decimal(5, 2)
+  coverage    Decimal  @db.Decimal(5, 2)
+  rating      String?
+  components  Json
+  missingData String[] @default([])
+  explanation String
+  capturedAt  DateTime @default(now())
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  createdBy   User?    @relation("HealthSnapshotCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([capturedAt])
+  @@index([createdById])
+}
+
+model ExecutiveReport {
+  id           String                   @id @default(uuid()) @db.Uuid
+  title        String
+  reportType   ExecutiveReportType
+  status       ExecutiveReportStatus    @default(DRAFT)
+  periodStart  DateTime?                @db.Date
+  periodEnd    DateTime?                @db.Date
+  generatedAt  DateTime?
+  preparedById String                   @db.Uuid
+  approvedById String?                  @db.Uuid
+  approvedAt   DateTime?
+  createdById  String                   @db.Uuid
+  updatedById  String                   @db.Uuid
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  deletedAt    DateTime?
+  preparedBy   User                     @relation("ExecutiveReportPreparedBy", fields: [preparedById], references: [id], onDelete: Restrict)
+  approvedBy   User?                    @relation("ExecutiveReportApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdBy    User                     @relation("ExecutiveReportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy    User                     @relation("ExecutiveReportUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  sections     ExecutiveReportSection[]
+
+  @@index([reportType, status])
+  @@index([preparedById, status])
+  @@index([approvedById])
+  @@index([generatedAt])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model ExecutiveReportSection {
+  id               String          @id @default(uuid()) @db.Uuid
+  reportId         String          @db.Uuid
+  title            String
+  content          Json
+  sortOrder        Int             @default(0)
+  sourceReferences Json?
+  createdById      String          @db.Uuid
+  updatedById      String          @db.Uuid
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+  report           ExecutiveReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  createdBy        User            @relation("ReportSectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy        User            @relation("ReportSectionUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([reportId, sortOrder])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
 }

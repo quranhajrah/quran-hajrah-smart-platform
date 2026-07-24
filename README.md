@@ -1,8 +1,8 @@
 # Quran Hajrah Smart Platform
 
-Production TypeScript monorepo for the Quran Hajrah Smart Platform. It includes the secure identity/RBAC foundation, Hostinger production runtime, and the Institutional Knowledge Center.
+Production TypeScript monorepo for the Quran Hajrah Smart Platform. It includes secure identity/RBAC, the Institutional Knowledge Center, and the Executive Intelligence Platform.
 
-Current release: `22.0.0` — Enterprise 22 Institutional Knowledge Center.
+Current release: `23.0.0` — Enterprise 23 Executive Intelligence Platform.
 
 ## Structure
 
@@ -10,7 +10,7 @@ Current release: `22.0.0` — Enterprise 22 Institutional Knowledge Center.
 apps/
   admin/       React + Vite Arabic administration application
   portal/      React + Vite public portal
-  api/         Express identity and document API
+  api/         Express identity, knowledge, and executive intelligence API
 packages/
   shared/      Shared TypeScript utilities and types
   auth/        Authentication package
@@ -99,10 +99,36 @@ Enterprise 22 provides the first production business module at `/documents` in a
 
 Production operators must set `DOCUMENT_STORAGE_ROOT` to a persistent, non-public Hostinger directory and include that directory in encrypted backups. `DOCUMENT_MAX_FILE_SIZE_MB` defaults to 25.
 
+## Executive Intelligence Platform
+
+Enterprise 23 makes the Arabic RTL executive dashboard the authenticated landing page and adds:
+
+- An institutional metric registry with measurements, targets, thresholds, history, and trends.
+- Strategic objectives, KPIs, operational initiatives, milestones, progress updates, budgets, and evidence links.
+- An institutional risk register with automatic scores, heat matrix, treatments, deadlines, and evidence.
+- Reusable executive alert generation for expiring documents, delayed initiatives, at-risk KPIs, critical risks, overdue treatments, budget overruns, inactive users, and missing reports.
+- A transparent 0–100 executive health score with configurable weights, component scores, data coverage, missing-data disclosure, and historical snapshots.
+- Structured executive reports with editable stored sections, approval workflow, print view, and source references.
+- A local structured-query assistant labelled “مساعد تنفيذي — إصدار البيانات المؤسسية”; it performs database queries only and does not call a generative AI provider.
+
+The idempotent seed creates 20 metric **definitions** but never inserts uncertain association measurements. Enter the first real measurement through the protected API or administration interface. Alert generation is scheduler-ready:
+
+```bash
+npm run executive:alerts
+```
+
+The command is intentionally not scheduled by the application. Configure a Hostinger scheduler only after the operator approves its frequency and runtime environment.
+
 ## Documentation
 
 - [Authentication and RBAC](docs/authentication-and-rbac.md)
 - [Institutional Knowledge Center](docs/institutional-knowledge-center.md)
+- [Enterprise 23 usage guide](docs/enterprise-23-executive-intelligence.md)
+- [Executive health score methodology](docs/executive-health-score-methodology.md)
+- [KPI methodology](docs/kpi-methodology.md)
+- [Risk methodology](docs/risk-methodology.md)
+- [Administrator guide](docs/enterprise-23-administrator-guide.md)
 - [Production architecture](docs/production-architecture.md)
 - [Enterprise 21 production baseline](docs/enterprise-21-production-readiness.md)
+- [Backup and restore](docs/backup-and-restore.md)
 - [Hostinger deployment](hostinger/README.md)

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -15,12 +15,13 @@ const admin = {
       name: 'super_admin',
       displayName: 'مدير النظام العام',
       isSystem: true,
-      permissions: ['users.view'],
+      permissions: ['dashboard.view', 'users.view'],
     },
   ],
 };
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   window.history.replaceState({}, '', '/');
 });
@@ -40,7 +41,7 @@ describe('admin authentication flow', () => {
           JSON.stringify({
             accessToken: 'test-access-token',
             user: admin,
-            permissions: ['users.view'],
+            permissions: ['dashboard.view', 'users.view'],
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
@@ -50,6 +51,46 @@ describe('admin authentication flow', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
+      }
+      if (url.endsWith('/executive/dashboard')) {
+        return new Response(
+          JSON.stringify({
+            summary: {
+              documents: { total: 0, active: 0, underReview: 0, expiring: 0, archived: 0 },
+              activeUsers: 1,
+              recentSystemActivity: 0,
+              objectives: { total: 0, averageProgress: null },
+              kpis: {},
+              initiatives: {
+                total: 0,
+                active: 0,
+                delayed: 0,
+                atRisk: 0,
+                completed: 0,
+                plannedBudget: 0,
+                actualSpending: 0,
+                budgetVariance: { amount: 0, percentage: null },
+              },
+              risks: { open: 0, critical: 0, averageResidualScore: null },
+            },
+            associationIndicators: {},
+            institutionalMetrics: {},
+            health: {
+              score: null,
+              coverage: 0,
+              rating: null,
+              components: [],
+              missingData: ['governance'],
+              explanation: 'البيانات غير مكتملة.',
+            },
+            recentDocuments: [],
+            recentActivities: [],
+            alerts: [],
+            upcomingDeadlines: [],
+            quickActions: [],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
       }
       return new Response(JSON.stringify({ error: {} }), {
         status: 404,
@@ -139,5 +180,83 @@ describe('admin authentication flow', () => {
     expect(await screen.findByRole('heading', { name: 'مركز المعرفة المؤسسية' })).toBeTruthy();
     expect(await screen.findAllByText('التقرير السنوي')).not.toHaveLength(0);
     expect(screen.getByRole('button', { name: '+ رفع مستند' })).toBeTruthy();
+  });
+
+  it('renders the executive dashboard without invented association statistics', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      const json = (body: unknown) =>
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      if (url.endsWith('/auth/refresh')) {
+        return json({
+          accessToken: 'test-access-token',
+          user: admin,
+          permissions: ['dashboard.view', 'executive.query'],
+        });
+      }
+      if (url.endsWith('/executive/dashboard')) {
+        return json({
+          summary: {
+            documents: { total: 3, active: 2, underReview: 1, expiring: 0, archived: 0 },
+            activeUsers: 1,
+            recentSystemActivity: 0,
+            objectives: { total: 0, averageProgress: null },
+            kpis: {},
+            initiatives: {
+              total: 0,
+              active: 0,
+              delayed: 0,
+              atRisk: 0,
+              completed: 0,
+              plannedBudget: 0,
+              actualSpending: 0,
+              budgetVariance: { amount: 0, percentage: null },
+            },
+            risks: { open: 0, critical: 0, averageResidualScore: null },
+          },
+          associationIndicators: {
+            beneficiaries_total: null,
+            students_male: null,
+            students_female: null,
+            teachers_male: null,
+            teachers_female: null,
+            circles_in_person: null,
+            circles_remote: null,
+            memorized_pages_weekly: null,
+            memorized_pages_monthly: null,
+            completed_parts: null,
+            attendance_rate: null,
+            retention_rate: null,
+          },
+          institutionalMetrics: {},
+          health: {
+            score: null,
+            coverage: 0,
+            rating: null,
+            components: [],
+            missingData: ['governance'],
+            explanation: 'لا تتوفر بيانات كافية.',
+          },
+          recentDocuments: [],
+          recentActivities: [],
+          alerts: [],
+          upcomingDeadlines: [],
+          quickActions: [],
+        });
+      }
+      return new Response(JSON.stringify({ error: {} }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'لوحة القيادة التنفيذية' })).toBeTruthy();
+    expect(await screen.findByText('مساعد تنفيذي — إصدار البيانات المؤسسية')).toBeTruthy();
+    expect((await screen.findAllByText('لا توجد بيانات')).length).toBeGreaterThan(0);
   });
 });

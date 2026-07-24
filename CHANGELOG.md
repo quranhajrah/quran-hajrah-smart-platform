@@ -2,6 +2,19 @@
 
 All notable changes to Quran Hajrah Smart Platform are documented here.
 
+## [23.0.0] - 2026-07-24
+
+### Enterprise 23 Executive Intelligence Platform
+
+- Added a production executive data model for institutional metrics, strategy, KPIs, initiatives, milestones, risks, treatments, alerts, dashboard preferences, health snapshots, and reports.
+- Added an additive Prisma migration and idempotent seed for executive permissions, 20 metric definitions without fabricated measurements, health-score weights, and default dashboard preferences.
+- Added authenticated, validated, paginated, audited, and server-side RBAC-protected executive APIs.
+- Added transparent KPI, initiative, budget, risk, and executive-health calculations with explicit missing-data behavior.
+- Added structured alert generation and a scheduler-ready command without introducing a runtime cron dependency.
+- Added structured Arabic executive queries backed only by local database queries and no external AI calls.
+- Made the Arabic RTL executive dashboard the default authenticated landing page and added responsive management interfaces and dependency-free charts.
+- Added unit, API, authorization, security, migration-compatibility, report-workflow, and UI validation coverage.
+
 ## [22.0.0] - 2026-07-23
 
 ### Enterprise 22 Institutional Knowledge Center

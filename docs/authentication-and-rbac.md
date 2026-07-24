@@ -37,10 +37,19 @@ System roles are seeded idempotently. Only `super_admin` receives all permission
 - Roles: `roles.view`, `roles.manage`
 - Platform: `dashboard.view`, `audit.view`, `settings.manage`
 - Documents: `documents.view`, `documents.create`, `documents.update`, `documents.upload`, `documents.download`, `documents.archive`, `documents.delete`, `documents.audit`, `documents.manage_access`
+- Executive dashboard: `dashboard.view`, `dashboard.configure`, `executive.query`
+- Institutional metrics: `metrics.view`, `metrics.manage`, `metrics.measure`
+- Strategy and KPIs: `strategy.view`, `strategy.manage`, `kpi.view`, `kpi.manage`, `kpi.measure`
+- Initiatives and risks: `initiatives.view`, `initiatives.manage`, `risks.view`, `risks.manage`
+- Alerts and reports: `alerts.view`, `alerts.manage`, `reports.view`, `reports.create`, `reports.approve`
 
 Permissions are rows keyed by a stable dotted code and grouped by `module`, allowing future modules to add permission records without changing authorization middleware.
 
 Only `super_admin` receives every platform permission. Enterprise 22 grants document permissions narrowly by existing institutional role. Confidential and highly confidential documents also pass a separate role/access-rule check, so possession of `documents.view` alone does not reveal restricted records. Direct document access rules can target one user or one role, expire automatically, and separately allow view, download, or edit.
+
+Enterprise 23 grants the seeded `board_chair` and `executive_director` roles the executive management set, including approval and dashboard configuration. The seeded `viewer` role receives executive read-only permissions. The seed never assigns a role to a user and never changes a user's role membership. `super_admin` remains the only role automatically synchronized with every permission.
+
+Every executive mutation enforces its specific permission server-side, uses a strict Zod object to prevent mass assignment, and creates a common `AuditLog` entry. Report generation uses `reports.create`, while approval and archival require the separate `reports.approve` capability. Evidence links also pass the Enterprise 22 confidentiality check; executive permissions do not bypass document confidentiality.
 
 ## Environment variables
 
@@ -94,7 +103,7 @@ The final active super administrator cannot disable itself or lose its super-adm
 npm run test
 ```
 
-The test stores are created fresh before every test and exist only in process memory. Tests cover valid and invalid login, inactive users, refresh rotation, logout revocation, authentication and permission denial, allowed access, user creation, hash omission, last-super-admin protection, document confidentiality, file upload controls, and audit creation.
+The test stores are created fresh before every test and exist only in process memory. Tests cover valid and invalid login, inactive users, refresh rotation, logout revocation, authentication and permission denial, allowed access, user creation, hash omission, last-super-admin protection, document confidentiality, file upload controls, executive RBAC, distinct report approval, and audit creation.
 
 ## Security considerations
 

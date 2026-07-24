@@ -44,6 +44,7 @@ if (!/directUrl\s*=\s*env\("DIRECT_URL"\)/.test(prismaSchema)) {
   throw new Error('Prisma migrations must use DIRECT_URL.');
 }
 await access(new URL('../apps/api/dist/server.js', import.meta.url));
+await access(new URL('../apps/api/dist/executive/generate-alerts.js', import.meta.url));
 await access(new URL('../packages/database/dist/create-admin.js', import.meta.url));
 await access(new URL('../packages/database/dist/admin-provisioning.js', import.meta.url));
 await access(new URL('../packages/database/dist/admin-bootstrap.js', import.meta.url));

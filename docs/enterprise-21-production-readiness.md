@@ -40,6 +40,8 @@ Hostinger documents GitHub import, Express support, selectable Node versions, en
 
 Backups belong to approved protected storage, never the Git repository. Enable PostgreSQL automated backups and point-in-time recovery where available. Enterprise 22 also requires encrypted backups of `DOCUMENT_STORAGE_ROOT` coordinated with the database recovery point. Before migration, record the current commit and create both recovery artifacts. Test restoration into a separate non-production environment and run `/ready`, authentication, document listing, and a controlled download against the restored copy.
 
+Enterprise 23 adds executive tables through committed additive migration `20260724_enterprise_23_executive_intelligence`. The deployment lifecycle and Hostinger entry file do not change. After restoration or deployment, also verify the executive dashboard, RBAC denial/allow behavior, metric/KPI/initiative/risk/alert/report acceptance records, and their audit entries. See `backup-and-restore.md` and `hostinger/deployment-checklist.md`.
+
 For an application-only regression, redeploy the last known-good commit. For a schema issue, prefer a forward migration. Database snapshot restoration is an incident operation requiring impact review; never improvise destructive SQL or commit database exports.
 
 ## Rollback

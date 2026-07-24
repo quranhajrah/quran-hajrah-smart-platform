@@ -24,7 +24,7 @@ Hostinger supports GitHub import for public Node.js applications and stores serv
 Hostinger launches `apps/api/dist/server.js` directly so Express can call `listen()` immediately. The `postbuild:production` lifecycle runs these operations, in order, after compilation and before Hostinger starts that entry file:
 
 1. `npm run db:deploy` applies committed migrations with `npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma`.
-2. `npm run db:seed` idempotently creates system roles, permissions, and document categories.
+2. `npm run db:seed` idempotently creates system roles, permissions, document categories, Enterprise 23 metric definitions, and dashboard defaults. It does not create metric measurements.
 3. `npm run admin:bootstrap:production` skips unless `ADMIN_BOOTSTRAP_ENABLED` is exactly `true`; when enabled, it creates or updates the first super administrator without logging the password.
 
 Prisma uses the schema's `directUrl = env("DIRECT_URL")` for migrations. `prestart:production` provides the migration guard for npm-managed runtimes. Do not replace these lifecycle steps with `prisma migrate dev` or `prisma db push`.
@@ -32,6 +32,18 @@ Prisma uses the schema's `directUrl = env("DIRECT_URL")` for migrations. `presta
 The root `postinstall` generates Prisma Client from the monorepo schema explicitly. It does not connect to PostgreSQL; database availability is reported separately by `/ready` and never blocks `/health` or the listening socket.
 
 Complete the environment, deployment, and rollback checklists before declaring production success.
+
+## Enterprise 23 deployment
+
+Migration `20260724_enterprise_23_executive_intelligence` is additive and is applied by the existing `db:deploy` lifecycle. Do not use `prisma migrate dev`, `prisma db push`, reset, or delete operations in production. After deployment:
+
+1. Confirm `/health` returns `{"status":"ok"}` and `/ready` returns `{"status":"ready",...}`.
+2. Log in and verify the default route displays the executive dashboard.
+3. Verify a read-only role cannot call management endpoints.
+4. Enter and verify one approved test record for a metric, KPI, initiative, risk, alert, and report using non-sensitive acceptance data.
+5. Confirm each mutation appears in the common audit log, then remove or archive acceptance records under the approved retention policy.
+
+The alert command is `npm run executive:alerts`. If a Hostinger scheduled task is configured later, use that command from the repository root with the same production environment. Run it manually once and verify idempotency before scheduling. It does not delay `server.js`, and Hostinger's entry file remains unchanged.
 
 ## One-time administrator bootstrap
 
