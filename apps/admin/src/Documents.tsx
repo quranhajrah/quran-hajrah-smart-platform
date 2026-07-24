@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useParams } from 'react-router-dom';
 import {
   api,
+  ApiRequestError,
   downloadDocument,
   uploadDocumentFile,
   type DocumentAudit,
@@ -125,35 +126,60 @@ function UploadDocument({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<string[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError('');
+    setFieldErrors([]);
     const form = new FormData(event.currentTarget);
-    const selectedFile = form.get('file');
-    if (!(selectedFile instanceof File) || selectedFile.size === 0) {
+    if (!selectedFile || selectedFile.size === 0) {
       setBusy(false);
       setError('اختر ملفًا صالحًا للرفع.');
       return;
     }
-    const keywords = String(form.get('keywords') ?? '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-    const tags = String(form.get('tags') ?? '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
+    const splitValues = (name: string) =>
+      [
+        ...new Set(
+          String(form.get(name) ?? '')
+            .split(/[,،;\n]+/u)
+            .map((value) => value.trim())
+            .filter(Boolean),
+        ),
+      ];
+    const keywords = splitValues('keywords');
+    const tags = splitValues('tags');
     const optional = (name: string) => {
       const value = String(form.get(name) ?? '').trim();
       return value || undefined;
     };
     try {
+      if (keywords.length > 30 || keywords.some((value) => value.length > 80)) {
+        throw new ApiRequestError('راجع الكلمات المفتاحية.', 'CLIENT_VALIDATION', [
+          {
+            field: 'keywords',
+            label: 'الكلمات المفتاحية',
+            code: 'too_big',
+            message: 'الكلمات المفتاحية: الحد الأقصى 30 كلمة، وطول كل كلمة 80 حرفًا.',
+          },
+        ]);
+      }
+      if (tags.length > 20 || tags.some((value) => value.length > 60)) {
+        throw new ApiRequestError('راجع الوسوم.', 'CLIENT_VALIDATION', [
+          {
+            field: 'tags',
+            label: 'الوسوم',
+            code: 'too_big',
+            message: 'الوسوم: الحد الأقصى 20 وسمًا، وطول كل وسم 60 حرفًا.',
+          },
+        ]);
+      }
       const document = await api<DocumentRecord>('/documents', {
         method: 'POST',
         body: JSON.stringify({
-          title: String(form.get('title')),
+          title: String(form.get('title')).trim(),
           description: optional('description'),
           categoryId: String(form.get('categoryId')),
           documentType: String(form.get('documentType')),
@@ -172,6 +198,7 @@ function UploadDocument({
       onUploaded(uploaded.document);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'تعذر رفع المستند.');
+      setFieldErrors(cause instanceof ApiRequestError ? cause.fields.map((item) => item.message) : []);
     } finally {
       setBusy(false);
     }
@@ -292,12 +319,20 @@ function UploadDocument({
               type="file"
               required
               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.txt,.csv"
+              onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
             />
             <small>الحد الأعلى ٢٥ م.ب — PDF وملفات Office والصور والنصوص</small>
           </label>
           {error && (
             <div className="field-wide">
               <Message error>{error}</Message>
+              {fieldErrors.length > 0 && (
+                <ul className="field-errors" aria-label="أخطاء التحقق">
+                  {fieldErrors.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
           <div className="form-actions field-wide">

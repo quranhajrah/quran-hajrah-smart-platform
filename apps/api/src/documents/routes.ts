@@ -45,7 +45,10 @@ const documentFields = z
       !value.effectiveDate ||
       !value.expiryDate ||
       value.expiryDate.getTime() >= value.effectiveDate.getTime(),
-    { message: 'Expiry date must not precede the effective date.' },
+    {
+      path: ['expiryDate'],
+      message: 'تاريخ الانتهاء يجب أن يساوي تاريخ السريان أو يأتي بعده.',
+    },
   );
 
 const updateDocumentSchema = z

@@ -86,6 +86,8 @@ The required categories and owning departments are committed reference data. Mig
 
 Binary upload uses the actual MIME type in `Content-Type` and a URI-encoded original name in `X-File-Name`. New versions may include `X-Version-Notes`. JSON and binaries are intentionally separate so metadata remains strictly validated and file bodies receive an independent size limit.
 
+Validation failures return `VALIDATION_ERROR` with an Arabic summary and a safe `fields` array containing `field`, `label`, `code`, and `message`. Values submitted by the user are never included in the response or validation log. The admin form displays every field message and accepts Arabic or English commas, semicolons, and new lines between keywords and tags.
+
 ## Authorization and confidentiality
 
 RBAC determines whether a user may invoke an operation. Confidentiality then restricts which specific record that user may see:

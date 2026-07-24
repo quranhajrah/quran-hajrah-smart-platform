@@ -176,6 +176,24 @@ export const setAccessToken = (token: string | null) => {
   accessToken = token;
 };
 
+export type ApiFieldError = {
+  field: string;
+  label: string;
+  code: string;
+  message: string;
+};
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly fields: ApiFieldError[] = [],
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (typeof options.body === 'string' && !headers.has('Content-Type')) {
@@ -189,9 +207,13 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
+      error?: { code?: string; message?: string; fields?: ApiFieldError[] };
     } | null;
-    throw new Error(body?.error?.message ?? 'تعذر إكمال الطلب.');
+    throw new ApiRequestError(
+      body?.error?.message ?? 'تعذر إكمال الطلب.',
+      body?.error?.code,
+      body?.error?.fields ?? [],
+    );
   }
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
 }

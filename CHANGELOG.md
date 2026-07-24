@@ -9,6 +9,7 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 - Guaranteed the sixteen Knowledge Center categories and eight owning departments through an additive migration and the idempotent production seed.
 - Added protected category, owning-department, and combined document lookup endpoints.
 - Prevented the upload form from rendering empty required selectors and separated lookup loading from dashboard-summary loading.
+- Replaced generic Zod failures with safe Arabic field-level validation details and aligned the document form's keyword, tag, optional-field, and date payload rules with the API.
 
 ## [23.0.0] - 2026-07-24
 

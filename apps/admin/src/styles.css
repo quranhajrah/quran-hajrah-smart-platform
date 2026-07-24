@@ -841,6 +841,15 @@ td small {
   flex: 1;
   margin: 0;
 }
+.field-errors {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0 1.25rem 0 0;
+  color: #9c2f2f;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(145px, 1fr));

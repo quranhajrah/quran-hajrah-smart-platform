@@ -397,6 +397,64 @@ describe('Institutional Knowledge Center API', () => {
     expect(invalidDepartment.body.error.code).toBe('INVALID_OWNING_DEPARTMENT');
   });
 
+  it('returns safe Arabic field-level Zod validation errors', async () => {
+    const response = await authenticated('post', '/api/documents').send({
+      title: 'الخطة الاستراتيجية',
+      categoryId: 'not-a-uuid',
+      documentType: 'STRATEGIC_PLAN',
+      owningDepartment: expectedOwningDepartmentNames[0],
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.message).toBe(
+      'تعذر التحقق من بيانات الطلب. راجع الحقول الموضحة.',
+    );
+    expect(response.body.error.message).not.toBe('Invalid request data.');
+    expect(response.body.error.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'categoryId',
+          label: 'التصنيف',
+          code: 'invalid_string',
+          message: 'التصنيف: التنسيق غير صحيح.',
+        }),
+      ]),
+    );
+  });
+
+  it('creates complete strategic-plan metadata and uploads its PDF', async () => {
+    const metadata = await authenticated('post', '/api/documents').send({
+      title: 'الخطة الاستراتيجية للجمعية',
+      description: 'الخطة الاستراتيجية المعتمدة ومؤشرات تنفيذها.',
+      categoryId: documentStore.categories[0]!.id,
+      documentType: 'STRATEGIC_PLAN',
+      documentNumber: 'SP-2026-01',
+      documentDate: '2026-07-24',
+      effectiveDate: '2026-08-01',
+      expiryDate: '2030-12-31',
+      status: 'ACTIVE',
+      confidentialityLevel: 'INTERNAL',
+      owningDepartment: expectedOwningDepartmentNames[0],
+      keywords: ['الخطة الاستراتيجية', 'الأهداف المؤسسية'],
+      tags: ['استراتيجية', 'اعتماد'],
+    });
+
+    expect(metadata.status).toBe(201);
+    expect(metadata.body.documentType).toBe('STRATEGIC_PLAN');
+    expect(metadata.body.owningDepartment).toBe(expectedOwningDepartmentNames[0]);
+
+    const upload = await authenticated('put', `/api/documents/${metadata.body.id}/file`)
+      .set('Content-Type', 'application/pdf')
+      .set('X-File-Name', encodeURIComponent('الخطة الاستراتيجية.pdf'))
+      .send(Buffer.from('%PDF-1.7\nstrategic-plan-production-uat'));
+
+    expect(upload.status).toBe(201);
+    expect(upload.body.document.versionNumber).toBe(1);
+    expect(upload.body.document.hasFile).toBe(true);
+    expect(upload.body.version.originalFileName).toBe('الخطة الاستراتيجية.pdf');
+  });
+
   it('creates metadata without exposing storage paths and records an audit entry', async () => {
     const document = await createDocument();
     const response = await authenticated('get', `/api/documents/${document.id}`);

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -149,7 +149,7 @@ describe('admin authentication flow', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       const json = (body: unknown) =>
         new Response(JSON.stringify(body), {
@@ -177,6 +177,25 @@ describe('admin authentication flow', () => {
         return json({ categories: [category], owningDepartments: [owningDepartment] });
       }
       if (url.includes('/documents?')) return json({ items: [document], total: 1 });
+      if (url.endsWith('/documents') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'تعذر التحقق من بيانات الطلب. راجع الحقول الموضحة.',
+              fields: [
+                {
+                  field: 'categoryId',
+                  label: 'التصنيف',
+                  code: 'invalid_string',
+                  message: 'التصنيف: التنسيق غير صحيح.',
+                },
+              ],
+            },
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
       return new Response(JSON.stringify({ error: {} }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
@@ -194,6 +213,42 @@ describe('admin authentication flow', () => {
     expect(screen.getByLabelText('التصنيف').querySelectorAll('option')).toHaveLength(2);
     expect(screen.getByLabelText('الإدارة المالكة').querySelectorAll('option')).toHaveLength(2);
     expect(screen.getByRole('option', { name: 'الإدارة التنفيذية' })).toBeTruthy();
+    await user.type(screen.getByLabelText('عنوان المستند'), 'الخطة الاستراتيجية');
+    await user.selectOptions(screen.getByLabelText('التصنيف'), category.id);
+    await user.selectOptions(screen.getByLabelText('نوع المستند'), 'STRATEGIC_PLAN');
+    await user.selectOptions(screen.getByLabelText('الإدارة المالكة'), owningDepartment.name);
+    await user.type(screen.getByLabelText('رقم المستند'), 'SP-2026-01');
+    await user.selectOptions(screen.getByLabelText('الحالة'), 'ACTIVE');
+    await user.type(screen.getByLabelText('الوصف'), 'الخطة الاستراتيجية المعتمدة.');
+    await user.type(
+      screen.getByLabelText('الكلمات المفتاحية'),
+      'الخطة الاستراتيجية، الأهداف المؤسسية',
+    );
+    await user.type(screen.getByLabelText('الوسوم'), 'استراتيجية; اعتماد');
+    await user.upload(
+      screen.getByLabelText(/الملف/),
+      new window.File(['%PDF-1.7\nstrategic-plan'], 'الخطة الاستراتيجية.pdf', {
+        type: 'application/pdf',
+      }),
+    );
+    const submitButton = screen.getByRole('button', { name: 'حفظ ورفع المستند' });
+    fireEvent.submit(submitButton.closest('form')!);
+    expect(await screen.findByText('التصنيف: التنسيق غير صحيح.')).toBeTruthy();
+    const createCall = fetchMock.mock.calls.find(
+      ([input, init]) => String(input).endsWith('/documents') && init?.method === 'POST',
+    );
+    expect(JSON.parse(String(createCall?.[1]?.body))).toEqual({
+      title: 'الخطة الاستراتيجية',
+      description: 'الخطة الاستراتيجية المعتمدة.',
+      categoryId: category.id,
+      documentType: 'STRATEGIC_PLAN',
+      documentNumber: 'SP-2026-01',
+      status: 'ACTIVE',
+      confidentialityLevel: 'INTERNAL',
+      owningDepartment: owningDepartment.name,
+      keywords: ['الخطة الاستراتيجية', 'الأهداف المؤسسية'],
+      tags: ['استراتيجية', 'اعتماد'],
+    });
   });
 
   it('renders the executive dashboard without invented association statistics', async () => {
