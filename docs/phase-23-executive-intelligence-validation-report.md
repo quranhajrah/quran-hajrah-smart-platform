@@ -13,7 +13,7 @@
 
 - Local implementation and validation: **successful**
 - GitHub Actions: **successful** — both `validate` and `production` completed successfully
-- Hostinger deployment: **pending at report creation**
+- Hostinger deployment: **successful for the public runtime checks** — the new Enterprise 23 admin bundle is served
 - Production acceptance: **not yet complete**
 
 Production completion must not be claimed until Hostinger deploys the release, `/health` is healthy, `/ready` is ready, the authenticated dashboard loads, RBAC is verified, and a metric, KPI, initiative, risk, alert, and report have each been exercised in production.
@@ -134,6 +134,10 @@ The release uses these executive permissions:
 | Production dependency audit | Passed — 0 vulnerabilities |
 | GitHub Actions `validate` | Passed |
 | GitHub Actions `production` | Passed — migration, idempotent seed, runtime-only install, and smoke test |
+| Hostinger `/health` | Passed — `200 {"status":"ok"}` |
+| Hostinger `/ready` | Passed — Prisma, database, and migrations are all `ok` |
+| Hostinger admin shell | Passed — Enterprise 23 production bundle is served |
+| Anonymous executive API | Passed — protected dashboard returns `401` |
 
 The normal `build:production` lifecycle runs migration and seed against the configured production database. For the local artifact validation it was run with lifecycle scripts disabled because no disposable PostgreSQL instance was configured locally. GitHub Actions provides PostgreSQL and executes the complete lifecycle.
 
@@ -221,9 +225,9 @@ Release and documentation:
 ## Production acceptance checklist
 
 - [x] GitHub Actions is green for the implementation commit.
-- [ ] Hostinger deployment succeeds.
-- [ ] `/health` is `ok`.
-- [ ] `/ready` is `ready`.
+- [x] Hostinger deployment succeeds for public runtime checks.
+- [x] `/health` is `ok`.
+- [x] `/ready` is `ready`.
 - [ ] Executive dashboard loads after authentication.
 - [ ] Executive RBAC allow/deny behavior is verified in production.
 - [ ] One institutional metric measurement is tested.
