@@ -9,7 +9,7 @@ Validation date: 2026-07-25
 - Local implementation and validation: successful.
 - Release implementation commit: `eba854df06c08766dffb35fb07b1c80ec804ed48`.
 - GitHub Actions: successful. Both `validate` and PostgreSQL-backed `production` jobs passed in [run 30142252978](https://github.com/quranhajrah/quran-hajrah-smart-platform/actions/runs/30142252978).
-- Hostinger deployment: pending. The existing production release remains healthy and ready, but it had not exposed the Enterprise 24 API route or new frontend artifact when checked after CI.
+- Hostinger deployment: runtime deployment verified. `/health` and `/ready` returned 200, the admin served the Enterprise 24 frontend artifact, and the protected document-analysis API route returned 401 without authentication as expected.
 - Production acceptance: not claimed. It still requires an authenticated analysis of the real operational-plan PDF, human approval, one successful import, and visible source traceability.
 
 ## Implementation summary
@@ -128,6 +128,6 @@ During final validation, a newly published high-severity advisory affected avail
 - Analysis runs after request acceptance in the existing Node process. A restart can interrupt an in-flight job; cancel and retry it. A durable worker remains a future scaling option.
 - No production document or association statistic was used in local tests.
 
-Hostinger must deploy release commit `eba854df06c08766dffb35fb07b1c80ec804ed48`, apply the committed migration through `DIRECT_URL`, and run the idempotent seed. Operators must then verify `/health`, `/ready`, login, analysis storage access, and confidentiality.
+Hostinger deployed release commit `eba854df06c08766dffb35fb07b1c80ec804ed48`; the runtime health, readiness, frontend artifact, and protected API surface were verified. Operators must still verify authenticated login, analysis storage access, confidentiality, and the complete review/import workflow.
 
 For final acceptance, analyze **الخطة التشغيلية والموازنة لعام 2026** as an authorized user. Confirm only evidence-backed beneficiary groups, four objectives, responsibilities, dates, KPI descriptions, budget total, and budget lines; review evidence, approve at least one proposal, import it, and verify **عرض المصدر**. Any unsupported value must remain absent.
