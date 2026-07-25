@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from './router';
 import {
   api,
   ApiRequestError,
   downloadDocument,
   uploadDocumentFile,
+  type AnalysisJob,
   type DocumentAudit,
   type DocumentCategory,
   type DocumentDashboard,
@@ -140,15 +141,14 @@ function UploadDocument({
       setError('اختر ملفًا صالحًا للرفع.');
       return;
     }
-    const splitValues = (name: string) =>
-      [
-        ...new Set(
-          String(form.get(name) ?? '')
-            .split(/[,،;\n]+/u)
-            .map((value) => value.trim())
-            .filter(Boolean),
-        ),
-      ];
+    const splitValues = (name: string) => [
+      ...new Set(
+        String(form.get(name) ?? '')
+          .split(/[,،;\n]+/u)
+          .map((value) => value.trim())
+          .filter(Boolean),
+      ),
+    ];
     const keywords = splitValues('keywords');
     const tags = splitValues('tags');
     const optional = (name: string) => {
@@ -198,7 +198,9 @@ function UploadDocument({
       onUploaded(uploaded.document);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'تعذر رفع المستند.');
-      setFieldErrors(cause instanceof ApiRequestError ? cause.fields.map((item) => item.message) : []);
+      setFieldErrors(
+        cause instanceof ApiRequestError ? cause.fields.map((item) => item.message) : [],
+      );
     } finally {
       setBusy(false);
     }
@@ -662,20 +664,27 @@ export function DocumentDetails() {
   const [document, setDocument] = useState<DocumentRecord | null>(null);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [audit, setAudit] = useState<DocumentAudit[]>([]);
+  const [analysisJobs, setAnalysisJobs] = useState<AnalysisJob[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [nextDocument, nextVersions, nextAudit] = await Promise.all([
+    const [nextDocument, nextVersions, nextAudit, nextAnalysisJobs] = await Promise.all([
       api<DocumentRecord>(`/documents/${id}`),
       api<DocumentVersion[]>(`/documents/${id}/versions`),
       can('documents.audit')
         ? api<{ items: DocumentAudit[] }>(`/documents/${id}/audit`).then((result) => result.items)
         : Promise.resolve([]),
+      can('document_analysis.view')
+        ? api<{ items: AnalysisJob[] }>(
+            `/document-analysis/jobs?documentId=${id}&page=1&pageSize=20`,
+          ).then((result) => result.items)
+        : Promise.resolve([]),
     ]);
     setDocument(nextDocument);
     setVersions(nextVersions);
     setAudit(nextAudit);
+    setAnalysisJobs(nextAnalysisJobs);
   }, [can, id]);
 
   useEffect(() => {
@@ -712,6 +721,23 @@ export function DocumentDetails() {
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'تعذر رفع الإصدار.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function startAnalysis() {
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api<{ job: AnalysisJob; reused: boolean }>(
+        `/documents/${id}/analyze${analysisJobs.length > 0 ? '?force=true' : ''}`,
+        { method: 'POST' },
+      );
+      await load();
+      window.location.assign(`/document-analysis/jobs/${result.job.id}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر بدء تحليل المستند.');
     } finally {
       setBusy(false);
     }
@@ -815,6 +841,57 @@ export function DocumentDetails() {
             </div>
           )}
         </section>
+        {can('document_analysis.view') && (
+          <section className="card document-analysis-card">
+            <div className="section-heading">
+              <div>
+                <small>Enterprise 24</small>
+                <h2>تحليل المستند</h2>
+              </div>
+              {can('document_analysis.run') && document.hasFile && (
+                <button disabled={busy} onClick={() => void startAnalysis()}>
+                  {analysisJobs.length > 0 ? 'إعادة التحليل' : 'تحليل المستند'}
+                </button>
+              )}
+            </div>
+            {analysisJobs[0] ? (
+              <>
+                <dl>
+                  <div>
+                    <dt>آخر حالة</dt>
+                    <dd>{analysisJobs[0].status}</dd>
+                  </div>
+                  <div>
+                    <dt>عدد المقترحات</dt>
+                    <dd>{analysisJobs[0].proposalCount.toLocaleString('ar-SA')}</dd>
+                  </div>
+                  <div>
+                    <dt>المعتمد</dt>
+                    <dd>
+                      {
+                        analysisJobs.filter((job) =>
+                          ['APPROVED', 'PARTIALLY_APPROVED', 'IMPORTED'].includes(job.status),
+                        ).length
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>المستورد</dt>
+                    <dd>{analysisJobs.filter((job) => job.status === 'IMPORTED').length}</dd>
+                  </div>
+                </dl>
+                <Link
+                  className="outline-action"
+                  to={`/document-analysis/jobs/${analysisJobs[0].id}`}
+                >
+                  فتح مركز المراجعة
+                </Link>
+              </>
+            ) : (
+              <p>لم يبدأ تحليل هذا المستند بعد. لن يبدأ التحليل تلقائيًا عند الرفع.</p>
+            )}
+          </section>
+        )}
         {can('documents.upload') && !document.isArchived && (
           <section className="card new-version">
             <h2>رفع إصدار جديد</h2>

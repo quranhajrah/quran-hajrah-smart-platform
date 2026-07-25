@@ -1,6 +1,6 @@
 {
   "name": "quran-hajrah-smart-platform",
-  "version": "23.0.0",
+  "version": "24.0.0",
   "private": true,
   "type": "module",
   "description": "Quran Hajrah Smart Platform monorepo",
@@ -37,6 +37,7 @@
     "db:seed": "npm run seed -w @quran-hajrah/database",
     "admin:bootstrap:production": "node packages/database/dist/bootstrap-admin.js",
     "executive:alerts": "node apps/api/dist/executive/generate-alerts.js",
+    "document-analysis:alerts": "node apps/api/dist/analysis/generate-alerts.js",
     "create:admin": "node packages/database/dist/create-admin.js",
     "create:admin:dev": "npm run create:admin:dev -w @quran-hajrah/database"
   },

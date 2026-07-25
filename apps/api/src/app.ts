@@ -23,6 +23,9 @@ import type { DocumentStore } from './documents/store.js';
 import { PrismaExecutiveStore } from './executive/prisma-store.js';
 import { createExecutiveRouter } from './executive/routes.js';
 import type { ExecutiveStore } from './executive/store.js';
+import { PrismaAnalysisStore } from './analysis/prisma-store.js';
+import { createDocumentAnalysisRouter } from './analysis/routes.js';
+import type { AnalysisStore } from './analysis/store.js';
 
 export type AppDependencies = {
   store?: IdentityStore;
@@ -32,6 +35,7 @@ export type AppDependencies = {
   documentStore?: DocumentStore;
   storage?: StorageProvider;
   executiveStore?: ExecutiveStore;
+  analysisStore?: AnalysisStore;
 };
 
 export type ReadinessChecks = {
@@ -68,6 +72,9 @@ export const createApp = (dependencies: AppDependencies = {}) => {
   const documentStore = dependencies.documentStore ?? new PrismaDocumentStore();
   const storage = dependencies.storage ?? new LocalStorageProvider(config.documentStorageRoot);
   const executiveStore = dependencies.executiveStore ?? new PrismaExecutiveStore();
+  const analysisStore = dependencies.analysisStore ?? new PrismaAnalysisStore();
+  const executiveAnalysisStore =
+    dependencies.analysisStore ?? (config.nodeEnv === 'test' ? undefined : analysisStore);
   const app = express();
 
   app.disable('x-powered-by');
@@ -156,7 +163,20 @@ export const createApp = (dependencies: AppDependencies = {}) => {
   });
 
   app.use('/api', createDocumentRouter(store, documentStore, storage, config));
-  app.use('/api', createExecutiveRouter(store, documentStore, executiveStore, config));
+  app.use(
+    '/api',
+    createDocumentAnalysisRouter(store, documentStore, analysisStore, storage, config),
+  );
+  app.use(
+    '/api',
+    createExecutiveRouter(
+      store,
+      documentStore,
+      executiveStore,
+      config,
+      executiveAnalysisStore,
+    ),
+  );
   app.use('/api', createIdentityRouter(store, config));
   app.use('/api', (_request, _response, next) =>
     next(new AppError(404, 'API route not found.', 'NOT_FOUND')),

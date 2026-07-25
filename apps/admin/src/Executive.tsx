@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { Link, NavLink, useParams } from 'react-router-dom';
+import { Link, NavLink, useParams } from './router';
 import {
   api,
   type ExecutiveDashboard as DashboardData,
   type ExecutiveHealth,
   type ExecutiveRecord,
+  type SourceEvidenceReference,
   type PageResult,
   openExecutiveReportPrint,
 } from './api';
@@ -263,6 +264,32 @@ export function ExecutiveDashboard() {
                 </article>
               ))}
             </div>
+
+            {can('document_analysis.view') && (
+              <Section
+                title="ذكاء المستندات المؤسسية"
+                hint="تعكس الأرقام التحليلات الفعلية ومراحل المراجعة والاستيراد فقط."
+                action={<NavLink to="/document-analysis">فتح مركز المراجعة</NavLink>}
+              >
+                <div className="indicator-grid">
+                  {[
+                    ['المستندات المحللة', dashboard.documentAnalysis.analyzed],
+                    ['بانتظار المراجعة', dashboard.documentAnalysis.awaitingReview],
+                    ['بانتظار الاعتماد', dashboard.documentAnalysis.awaitingApproval],
+                    ['المقترحات المستوردة', dashboard.documentAnalysis.imported],
+                    ['تحليل متعثر', dashboard.documentAnalysis.failed],
+                    ['يحتاج OCR', dashboard.documentAnalysis.ocrRequired],
+                    ['سجلات الموازنة المستوردة', dashboard.documentAnalysis.budget.records],
+                    ['بنود الموازنة المستوردة', dashboard.documentAnalysis.budget.lines],
+                  ].map(([label, value]) => (
+                    <article key={String(label)}>
+                      <span>{label}</span>
+                      <strong>{number.format(Number(value))}</strong>
+                    </article>
+                  ))}
+                </div>
+              </Section>
+            )}
 
             <Section
               title="مؤشرات الجمعية القرآنية"
@@ -987,6 +1014,7 @@ export function ExecutiveDetail({ entity }: { entity: EntityDefinition['key'] })
   const definition = entityDefinitions[entity]!;
   const [record, setRecord] = useState<ExecutiveRecord | null>(null);
   const [history, setHistory] = useState<ExecutiveRecord[]>([]);
+  const [sourceReferences, setSourceReferences] = useState<SourceEvidenceReference[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [value, setValue] = useState('');
@@ -995,6 +1023,19 @@ export function ExecutiveDetail({ entity }: { entity: EntityDefinition['key'] })
     try {
       const next = await api<ExecutiveRecord>(`/executive/${entity}/${id}`);
       setRecord(next);
+      if (can('document_analysis.view')) {
+        const sourceType = {
+          metrics: 'METRIC',
+          objectives: 'STRATEGIC_OBJECTIVE',
+          kpis: 'KPI',
+          initiatives: 'INITIATIVE',
+          risks: 'RISK',
+          reports: 'EXECUTIVE_REPORT_SECTION',
+        }[entity];
+        setSourceReferences(
+          await api<SourceEvidenceReference[]>(`/document-analysis/sources/${sourceType}/${id}`),
+        );
+      }
       if (entity === 'metrics' || entity === 'kpis') {
         const historyResult = await api<PageResult>(
           `/executive/${entity}/${id}/${entity === 'metrics' ? 'history' : 'trend'}?page=1&pageSize=50`,
@@ -1006,7 +1047,7 @@ export function ExecutiveDetail({ entity }: { entity: EntityDefinition['key'] })
     } finally {
       setLoading(false);
     }
-  }, [entity, id]);
+  }, [can, entity, id]);
 
   useEffect(() => void load(), [load]);
 
@@ -1074,6 +1115,35 @@ export function ExecutiveDetail({ entity }: { entity: EntityDefinition['key'] })
                   ))}
               </dl>
             </Section>
+            {sourceReferences.length > 0 && (
+              <Section
+                title="المصادر المؤسسية"
+                hint="هذه البيانات مستوردة بعد مراجعة بشرية، ويظهر هنا المستند والصفحة والدليل."
+              >
+                <div className="source-reference-list">
+                  {sourceReferences.map((source) => (
+                    <article key={source.id}>
+                      <div>
+                        <strong>{source.document?.title ?? 'مستند مصدر'}</strong>
+                        <span>
+                          الصفحة {source.sourcePage ?? '—'}
+                          {source.sourceSection ? ` · ${source.sourceSection}` : ''}
+                        </span>
+                        {source.sourceEvidence && <blockquote>{source.sourceEvidence}</blockquote>}
+                      </div>
+                      <Link
+                        className="outline-action"
+                        to={`/documents/${source.sourceDocumentId}${
+                          source.sourcePage ? `?page=${source.sourcePage}` : ''
+                        }`}
+                      >
+                        عرض المصدر
+                      </Link>
+                    </article>
+                  ))}
+                </div>
+              </Section>
+            )}
             {can(definition.managePermission) && (
               <UpdateEntityForm entity={entity} record={record} onUpdated={load} />
             )}

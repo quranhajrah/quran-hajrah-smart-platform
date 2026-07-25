@@ -4,6 +4,19 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ## Unreleased
 
+## [24.0.0] - 2026-07-25
+
+### Enterprise 24 Institutional Document Intelligence Engine
+
+- Added an additive document-analysis schema for jobs, pages, text, tables, cells, proposals, fields, reviews, imports, source evidence, configuration, audit, and budget records.
+- Added bounded PDF embedded-text, DOCX, and TXT extraction behind a provider abstraction, with PDF page boundaries, ordered table cells, malformed/encrypted-file handling, and DOCX decompression-bomb protection.
+- Added deterministic Arabic institutional rules and specialized strategic-plan, operational-plan, budget, governance, financial-report, and policy extractors without external AI or OCR calls.
+- Added explicit, confidentiality-aware analysis APIs, review and approval workflows, conflict preview, transactional idempotent import, and source traceability.
+- Added the Arabic RTL analysis and review center, Knowledge Center actions, executive dashboard summaries, and source links on imported executive records.
+- Added narrowly scoped RBAC permissions, safe role defaults, scheduler-ready analysis alerts, and an idempotent default analysis configuration.
+- Added provider, rule, API, RBAC, confidentiality, rate-limit, atomic-import, source-traceability, and migration-compatibility tests.
+- Removed the affected React Router production dependency after a newly published advisory and replaced it with a bounded same-origin SPA router covered by navigation and external-target tests.
+
 ### Fixed
 
 - Guaranteed the sixteen Knowledge Center categories and eight owning departments through an additive migration and the idempotent production seed.

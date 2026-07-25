@@ -89,6 +89,111 @@ export type DocumentDashboard = {
   archived: number;
   recent: DocumentRecord[];
 };
+export type AnalysisJob = {
+  id: string;
+  documentId: string;
+  documentVersionId: string;
+  status: string;
+  extractionProvider?: string;
+  extractionVersion: string;
+  extractionMethod?: string;
+  startedAt?: string;
+  completedAt?: string;
+  reviewDueAt?: string;
+  failureReason?: string;
+  pageCount: number;
+  tableCount: number;
+  proposalCount: number;
+  createdAt: string;
+  updatedAt: string;
+  document?: {
+    id: string;
+    title: string;
+    confidentialityLevel: string;
+    documentType: string;
+    versionNumber: number;
+  };
+};
+export type AnalysisPage = {
+  id: string;
+  pageNumber: number;
+  hasEmbeddedText: boolean;
+  textLength: number;
+  extractionQuality?: number;
+  width?: number;
+  height?: number;
+  text?: string;
+};
+export type AnalysisTable = {
+  id: string;
+  pageNumber: number;
+  tableIndex: number;
+  title?: string;
+  sourceSection?: string;
+  rowCount: number;
+  columnCount: number;
+  confidence?: number;
+  rows: string[][];
+};
+export type AnalysisProposal = {
+  id: string;
+  jobId: string;
+  documentId: string;
+  documentVersionId: string;
+  proposalType: string;
+  decision: string;
+  title: string;
+  proposedData: Record<string, unknown>;
+  editedData?: Record<string, unknown>;
+  importTargetType: string;
+  extractionRuleId: string;
+  extractionMethod: string;
+  confidence: number;
+  sourcePage?: number;
+  sourceSection?: string;
+  evidenceSnippet?: string;
+  reviewedAt?: string;
+  fields?: Array<{
+    key: string;
+    labelAr: string;
+    dataType: string;
+    value: string | number | string[] | null;
+    sourceValue?: string;
+    confidence?: number;
+  }>;
+};
+export type AnalysisConflict = {
+  proposalId: string;
+  targetType: string;
+  status: 'ready' | 'conflict' | 'incomplete' | 'already_imported';
+  reason?: string;
+  existingRecordId?: string;
+  allowedActions: Array<'skip' | 'update' | 'create' | 'merge'>;
+  defaultAction: 'skip' | 'update' | 'create' | 'merge';
+};
+export type AnalysisImportBatch = {
+  id: string;
+  jobId: string;
+  status: string;
+  summary?: Record<string, unknown>;
+  failureReason?: string;
+  createdAt: string;
+  items?: Array<Record<string, unknown>>;
+};
+export type SourceEvidenceReference = {
+  id: string;
+  sourceDocumentId: string;
+  sourceDocumentVersionId: string;
+  sourceProposalId: string;
+  targetType: string;
+  targetRecordId: string;
+  sourcePage?: number;
+  sourceSection?: string;
+  sourceEvidence?: string;
+  extractionMethod: string;
+  importedAt: string;
+  document?: { id: string; title: string; confidentialityLevel: string };
+};
 export type ExecutiveRecord = {
   id: string;
   [key: string]: unknown;
@@ -162,6 +267,15 @@ export type ExecutiveDashboard = {
     }
   >;
   health: ExecutiveHealth;
+  documentAnalysis: {
+    analyzed: number;
+    awaitingReview: number;
+    awaitingApproval: number;
+    imported: number;
+    failed: number;
+    ocrRequired: number;
+    budget: { records: number; lines: number; totalPlanned: number };
+  };
   recentDocuments: DocumentRecord[];
   recentActivities: ExecutiveRecord[];
   alerts: ExecutiveRecord[];

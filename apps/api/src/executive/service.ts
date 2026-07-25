@@ -26,6 +26,7 @@ import type {
   HealthInputs,
   PageQuery,
 } from './types.js';
+import type { AnalysisStore } from '../analysis/store.js';
 
 const associationMetricKeys = [
   'beneficiaries_total',
@@ -63,6 +64,7 @@ export class ExecutiveService {
     private readonly store: ExecutiveStore,
     private readonly identityStore: IdentityStore,
     private readonly documentStore: DocumentStore,
+    private readonly analysisStore?: AnalysisStore,
   ) {}
 
   async list(entity: ExecutiveEntity, query: PageQuery) {
@@ -257,7 +259,7 @@ export class ExecutiveService {
   }
 
   async dashboard(user: IdentityUser) {
-    const [base, documents, health] = await Promise.all([
+    const [base, documents, health, documentAnalysis] = await Promise.all([
       this.store.dashboardBase(),
       this.documentStore.dashboard({
         userId: user.id,
@@ -265,6 +267,16 @@ export class ExecutiveService {
         allowedLevels: [...allowedConfidentialityLevels(user)],
       }),
       this.health(user),
+      this.analysisStore?.summary() ??
+        Promise.resolve({
+          analyzed: 0,
+          awaitingReview: 0,
+          awaitingApproval: 0,
+          imported: 0,
+          failed: 0,
+          ocrRequired: 0,
+          budget: { records: 0, lines: 0, totalPlanned: 0 },
+        }),
     ]);
     const metrics = Object.fromEntries(
       base.metrics.map((metric) => [
@@ -305,6 +317,7 @@ export class ExecutiveService {
       ),
       institutionalMetrics: metrics,
       health,
+      documentAnalysis,
       recentDocuments: documents.recent,
       recentActivities: base.recentActivity,
       alerts: base.alerts,

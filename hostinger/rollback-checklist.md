@@ -9,5 +9,7 @@
 - [ ] Restore a database snapshot only after impact review and with the application stopped or isolated.
 - [ ] Restore document metadata and binary storage from compatible recovery points; never overwrite newer files without an incident-approved reconciliation plan.
 - [ ] After rollback, verify `/health`, `/ready`, login, refresh, logout, protected API behavior, document listing, and a controlled file download.
+- [ ] Verify analysis jobs remain linked to existing immutable document versions and that imported records still resolve their source evidence.
+- [ ] Do not delete analysis, review, import, source-reference, or budget rows as a rollback shortcut; use a reviewed forward migration.
 - [ ] Inspect Hostinger deployment and runtime logs. Hostinger exposes centralized runtime logs in hPanel; see [runtime log guidance](https://www.hostinger.com/support/how-to-use-node-js-runtime-logs-at-hostinger/).
 - [ ] Record incident timeline, restored commit, restored database point, and validation evidence outside the public repository if it contains operational details.

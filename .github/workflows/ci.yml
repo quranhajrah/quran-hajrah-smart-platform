@@ -57,8 +57,14 @@ jobs:
       - run: npm run db:validate
       - run: npm run db:generate
       - run: npm run build:production
+      - name: Verify production migration state
+        run: npm run db:status
       - name: Verify idempotent production seed
         run: npm run db:seed && npm run db:seed
+      - name: Verify document-analysis alert command
+        run: npm run document-analysis:alerts
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Reinstall runtime dependencies only
         run: rm -rf node_modules && npm ci --omit=dev
       - run: npm run validate:production-startup

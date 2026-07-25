@@ -42,6 +42,7 @@ System roles are seeded idempotently. Only `super_admin` receives all permission
 - Strategy and KPIs: `strategy.view`, `strategy.manage`, `kpi.view`, `kpi.manage`, `kpi.measure`
 - Initiatives and risks: `initiatives.view`, `initiatives.manage`, `risks.view`, `risks.manage`
 - Alerts and reports: `alerts.view`, `alerts.manage`, `reports.view`, `reports.create`, `reports.approve`
+- Document intelligence: `document_analysis.view`, `document_analysis.run`, `document_analysis.review`, `document_analysis.approve`, `document_analysis.import`, `document_analysis.configure`, `document_analysis.audit`
 
 Permissions are rows keyed by a stable dotted code and grouped by `module`, allowing future modules to add permission records without changing authorization middleware.
 
@@ -50,6 +51,10 @@ Only `super_admin` receives every platform permission. Enterprise 22 grants docu
 Enterprise 23 grants the seeded `board_chair` and `executive_director` roles the executive management set, including approval and dashboard configuration. The seeded `viewer` role receives executive read-only permissions. The seed never assigns a role to a user and never changes a user's role membership. `super_admin` remains the only role automatically synchronized with every permission.
 
 Every executive mutation enforces its specific permission server-side, uses a strict Zod object to prevent mass assignment, and creates a common `AuditLog` entry. Report generation uses `reports.create`, while approval and archival require the separate `reports.approve` capability. Evidence links also pass the Enterprise 22 confidentiality check; executive permissions do not bypass document confidentiality.
+
+Enterprise 24 grants full analysis access to `super_admin`. `board_chair` receives the full analysis set including configuration; `executive_director` receives run, review, approve, import, and audit; `operations_manager` receives run, review, import, and audit; `governance_officer` receives run, review, approve, and audit; `viewer` receives read-only analysis access. The seed never assigns roles or changes user role membership.
+
+Analysis, approval, and import are deliberately separate permissions. Every analysis route checks authentication and its dotted permission, then checks access to the originating Knowledge Center document. An analysis permission never bypasses document confidentiality.
 
 ## Environment variables
 

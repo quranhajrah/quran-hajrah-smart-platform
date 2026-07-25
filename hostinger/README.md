@@ -56,3 +56,13 @@ After success, remove `ADMIN_TEMP_PASSWORD`, `ADMIN_EMAIL`, and `ADMIN_FULL_NAME
 Set `DOCUMENT_STORAGE_ROOT` to a persistent Hostinger directory that is writable by the Node.js process and is not publicly served. Do not place it below an exposed static/public directory. The application creates document-specific subdirectories and opaque file names at runtime. Set `DOCUMENT_MAX_FILE_SIZE_MB` to the approved upload limit (25 by default).
 
 The PostgreSQL backup and file-storage backup form one recovery unit. Back up both on a coordinated schedule, encrypt exports, restrict operator access, and test restoration outside production. A database restore without matching files leaves version metadata whose binaries are unavailable; a file restore without the matching database leaves unreferenced files.
+
+## Enterprise 24 deployment
+
+Migration `20260724_enterprise_24_document_intelligence` is additive. The existing `postbuild:production` lifecycle applies it through `DIRECT_URL` before seed and before Hostinger launches `apps/api/dist/server.js`. Analysis never delays `listen()`, and no entry-file or Hostinger Start Command change is required.
+
+The seed adds seven analysis permissions, safe role defaults, deterministic rule identifiers, and the bounded default analysis configuration. It never seeds extracted values.
+
+After deployment, use an authorized account to open a non-sensitive supported document, start analysis explicitly, inspect pages/tables/proposals, approve one evidence-backed proposal, run conflict preview, and confirm import. Open the imported Enterprise 23 record and verify “عرض المصدر”. An image-only PDF must report `OCR_REQUIRED`.
+
+The optional scheduler command is `npm run document-analysis:alerts`. It creates database-backed alerts only and performs no OCR or AI call. Run it manually and verify idempotency before adding any Hostinger schedule.

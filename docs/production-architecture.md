@@ -91,3 +91,17 @@ The managed Hostinger Node.js database wizard currently documents Supabase as it
 Logs are newline-delimited JSON and contain request ID, method, path without query parameters, status, duration, user ID when authenticated, and resolved client IP. Request bodies, authorization headers, cookies, tokens, passwords, secrets, and connection URLs are never logged.
 
 SIGTERM and SIGINT stop the HTTP server and disconnect Prisma. Uncaught exceptions and unhandled rejections are logged without sensitive request data and initiate shutdown.
+
+## Enterprise 24 document intelligence
+
+Enterprise 24 keeps the same single Node.js process and Hostinger entry file, `apps/api/dist/server.js`. Analysis starts only after an authenticated explicit request and runs after the HTTP response has been accepted, so it never delays `listen()` or the liveness endpoint.
+
+Protected routes under `/api/document-analysis/*` handle jobs, extracted pages and tables, proposals, review, import, configuration, audit, and source evidence. `POST /api/documents/:id/analyze` is the only analysis trigger. API routes remain registered before the admin SPA fallback.
+
+The current providers are PDF.js for embedded PDF text, Mammoth for DOCX, and UTF-8 passthrough for TXT. Processing enforces file, page, table, archive-entry, and uncompressed-size limits. Raw extracted text and document content are never written to normal logs. Unsupported, encrypted, malformed, and insufficiently textual documents fail safely; an image-only input becomes `OCR_REQUIRED`.
+
+Deterministic Arabic rules create evidence-backed proposals. Approval and import are separate permissions. One Prisma transaction covers each import batch, and every imported target receives a `SourceEvidenceReference` with document, version, proposal, page, section, evidence, method, actor, and timestamp. Budget imports use isolated `BudgetRecord` and `BudgetLine` tables and are summarized on the executive dashboard.
+
+Future OCR, semantic, LLM, embedding, and reranking providers are interfaces only. Enterprise 24 makes no external AI or OCR calls and does not claim semantic extraction.
+
+`npm run document-analysis:alerts` is the scheduler-ready command for failed analysis, overdue review, approved-but-not-imported proposals, and unresolved conflicts. It is not scheduled inside the API process.

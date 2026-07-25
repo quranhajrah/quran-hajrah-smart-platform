@@ -47,5 +47,11 @@
 - [ ] Create and verify one approved acceptance metric measurement, KPI, initiative, risk, alert, and report.
 - [ ] Verify report generation and approval require distinct permissions and all six acceptance actions appear in the audit log.
 - [ ] If scheduling alerts, run `npm run executive:alerts` once, confirm idempotency, and only then configure the approved Hostinger schedule.
+- [ ] Confirm migration `20260724_enterprise_24_document_intelligence` and the Enterprise 24 seed complete before `server.js` starts.
+- [ ] Start analysis explicitly for an approved text-based PDF and confirm the review center shows page, evidence, fields, confidence, and import destination.
+- [ ] Verify an image-only PDF becomes `OCR_REQUIRED` and is not reported as successfully extracted.
+- [ ] Approve and import one evidence-backed proposal, then verify “عرض المصدر” on the imported record.
+- [ ] Verify a read-only user without source-document access cannot view the job or source evidence.
+- [ ] If scheduling analysis alerts, run `npm run document-analysis:alerts` once and confirm idempotency before scheduling.
 
-Do not mark Enterprise 23 production successful until DNS, SSL, readiness, database migration, login, dashboard, RBAC, and the six production acceptance records are verified on the real domain.
+Do not mark Enterprise 24 production successful until CI, Hostinger deployment, health/readiness, authenticated analysis, real operational-plan proposal review, one source-linked import, and confidentiality RBAC are verified on the real domain.

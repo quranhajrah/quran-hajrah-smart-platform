@@ -8,6 +8,7 @@ import type { DocumentStore } from '../documents/store.js';
 import { calculateBudgetVariance } from './calculations.js';
 import { ExecutiveService } from './service.js';
 import type { ExecutiveStore } from './store.js';
+import type { AnalysisStore } from '../analysis/store.js';
 import {
   alertSeverities,
   initiativeStatuses,
@@ -336,10 +337,16 @@ export const createExecutiveRouter = (
   documentStore: DocumentStore,
   executiveStore: ExecutiveStore,
   config: AppConfig,
+  analysisStore?: AnalysisStore,
 ) => {
   const router = Router();
   const authenticated = requireAuth(identityStore, config);
-  const service = new ExecutiveService(executiveStore, identityStore, documentStore);
+  const service = new ExecutiveService(
+    executiveStore,
+    identityStore,
+    documentStore,
+    analysisStore,
+  );
   const queryLimiter = rateLimit({
     windowMs: config.rateLimitWindowMs,
     limit: Math.min(config.rateLimitMax, 30),

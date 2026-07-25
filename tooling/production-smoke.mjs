@@ -88,6 +88,11 @@ try {
   if (executiveDashboard.status !== 200 || !executiveDashboardHtml.includes('id="root"')) {
     throw new Error('Enterprise 23 admin SPA fallback failed.');
   }
+  const documentAnalysis = await fetch(`http://127.0.0.1:${port}/document-analysis`);
+  const documentAnalysisHtml = await documentAnalysis.text();
+  if (documentAnalysis.status !== 200 || !documentAnalysisHtml.includes('id="root"')) {
+    throw new Error('Enterprise 24 review center SPA fallback failed.');
+  }
 
   const portal = await fetch(`http://127.0.0.1:${port}/portal/`, { redirect: 'manual' });
   const portalHtml = await portal.text();
@@ -105,15 +110,19 @@ try {
   if (protectedDocuments.status !== 401) {
     throw new Error('Knowledge Center API did not reject anonymous access.');
   }
-  const protectedDocumentLookups = await fetch(
-    `http://127.0.0.1:${port}/api/document-lookups`,
-  );
+  const protectedDocumentLookups = await fetch(`http://127.0.0.1:${port}/api/document-lookups`);
   if (protectedDocumentLookups.status !== 401) {
     throw new Error('Knowledge Center lookup API did not reject anonymous access.');
   }
   const protectedExecutive = await fetch(`http://127.0.0.1:${port}/api/executive/dashboard`);
   if (protectedExecutive.status !== 401) {
     throw new Error('Executive Intelligence API did not reject anonymous access.');
+  }
+  const protectedDocumentAnalysis = await fetch(
+    `http://127.0.0.1:${port}/api/document-analysis/jobs`,
+  );
+  if (protectedDocumentAnalysis.status !== 401) {
+    throw new Error('Document Intelligence API did not reject anonymous access.');
   }
 
   const missingApi = await fetch(`http://127.0.0.1:${port}/api/not-a-route`);
@@ -152,7 +161,7 @@ try {
   }
 
   console.log(
-    'Production runtime, logs, health, readiness, SPAs, Knowledge Center, Executive Intelligence, static assets, and protected routes passed.',
+    'Production runtime, logs, health, readiness, SPAs, Knowledge Center, Executive Intelligence, Document Intelligence, static assets, and protected routes passed.',
   );
 } finally {
   child.kill('SIGTERM');

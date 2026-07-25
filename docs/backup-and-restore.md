@@ -1,5 +1,11 @@
 # Backup and Restore
 
+## Enterprise 24 analysis data
+
+Treat PostgreSQL and immutable document-version storage as one recovery unit. Enterprise 24 adds jobs, pages, extracted text/tables/cells, proposals, review decisions, import batches/items, source evidence, analysis configuration/audit, and budget records. A database snapshot without its matching document binaries cannot reproduce or display the evidence.
+
+After a restore, run `npm run db:status`, verify `/ready`, open a previously imported record, and confirm its “عرض المصدر” action reaches the matching document and page reference. Never use `prisma migrate reset`, `migrate dev`, or `db push` against production.
+
 ## Recovery set
 
 Enterprise 23 recovery requires:

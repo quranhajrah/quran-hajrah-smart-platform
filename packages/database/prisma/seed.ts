@@ -53,6 +53,13 @@ const permissions = [
   ['reports.create', 'إنشاء التقارير التنفيذية', 'reports'],
   ['reports.approve', 'اعتماد التقارير التنفيذية', 'reports'],
   ['executive.query', 'استخدام مساعد البيانات المؤسسية', 'executive'],
+  ['document_analysis.view', 'عرض تحليلات المستندات', 'document_analysis'],
+  ['document_analysis.run', 'تشغيل تحليل المستندات', 'document_analysis'],
+  ['document_analysis.review', 'مراجعة مقترحات الاستخراج', 'document_analysis'],
+  ['document_analysis.approve', 'اعتماد مقترحات الاستخراج', 'document_analysis'],
+  ['document_analysis.import', 'استيراد المقترحات المعتمدة', 'document_analysis'],
+  ['document_analysis.configure', 'تهيئة محرك تحليل المستندات', 'document_analysis'],
+  ['document_analysis.audit', 'عرض سجل تدقيق تحليل المستندات', 'document_analysis'],
 ] as const;
 
 const categories = [
@@ -199,6 +206,60 @@ const executivePermissionsByRole: Record<string, string[]> = {
   ],
 };
 
+const documentAnalysisPermissionsByRole: Record<string, string[]> = {
+  board_chair: [
+    'document_analysis.view',
+    'document_analysis.run',
+    'document_analysis.review',
+    'document_analysis.approve',
+    'document_analysis.import',
+    'document_analysis.configure',
+    'document_analysis.audit',
+  ],
+  executive_director: [
+    'document_analysis.view',
+    'document_analysis.run',
+    'document_analysis.review',
+    'document_analysis.approve',
+    'document_analysis.import',
+    'document_analysis.audit',
+  ],
+  operations_manager: [
+    'document_analysis.view',
+    'document_analysis.run',
+    'document_analysis.review',
+    'document_analysis.import',
+    'document_analysis.audit',
+  ],
+  governance_officer: [
+    'document_analysis.view',
+    'document_analysis.run',
+    'document_analysis.review',
+    'document_analysis.approve',
+    'document_analysis.audit',
+  ],
+  viewer: ['document_analysis.view'],
+};
+
+const documentAnalysisRuleIds = [
+  'section.objective.v1',
+  'section.kpi.v1',
+  'section.strategic_axis.v1',
+  'section.initiative.v1',
+  'section.milestone.v1',
+  'field.responsible_department.v1',
+  'field.date.v1',
+  'field.beneficiary_group.v1',
+  'amount.budget_total.v1',
+  'table.budget_line.v1',
+  'section.risk.v1',
+  'section.risk_treatment.v1',
+  'score.governance.v1',
+  'amount.financial.v1',
+  'section.policy_requirement.v1',
+  'period.reporting.v1',
+];
+
 const metricDefinitions = [
   ['beneficiaries_total', 'إجمالي المستفيدين', 'NUMBER', 'MONTHLY', 'مستفيد'],
   ['students_male', 'الطلاب', 'NUMBER', 'MONTHLY', 'طالب'],
@@ -295,6 +356,20 @@ async function main() {
     });
   }
 
+  for (const [roleName, permissionCodes] of Object.entries(
+    documentAnalysisPermissionsByRole,
+  )) {
+    const role = await prisma.role.findUniqueOrThrow({ where: { name: roleName } });
+    const rolePermissions = await prisma.permission.findMany({
+      where: { code: { in: permissionCodes } },
+      select: { id: true },
+    });
+    await prisma.rolePermission.createMany({
+      data: rolePermissions.map(({ id }) => ({ roleId: role.id, permissionId: id })),
+      skipDuplicates: true,
+    });
+  }
+
   for (const [key, nameAr, dataType, frequency, unit] of metricDefinitions) {
     const higherIsBetter = !['delayed_initiatives', 'open_risks', 'critical_risks'].includes(key);
     await prisma.institutionalMetric.upsert({
@@ -336,6 +411,69 @@ async function main() {
     },
   });
 
+  await prisma.documentAnalysisConfiguration.upsert({
+    where: { key: 'institutional-default' },
+    update: {
+      isActive: true,
+      providerVersion: 'enterprise-24-rules-v1',
+      maxFileSizeBytes: 26_214_400,
+      maxPages: 500,
+      maxTables: 300,
+      minimumTextCharacters: 80,
+      proposalConfidence: 0.7,
+      reviewSlaHours: 72,
+      enabledDocumentTypes: [
+        'STRATEGIC_PLAN',
+        'OPERATIONAL_PLAN',
+        'BUDGET',
+        'POLICY',
+        'REGULATION',
+        'REPORT',
+        'MINUTES',
+        'LETTER',
+        'CONTRACT',
+        'GOVERNANCE',
+        'FINANCIAL',
+        'PROGRAM',
+        'EMPLOYEE',
+        'EDUCATIONAL',
+        'MEDIA',
+        'OTHER',
+      ],
+      enabledRuleIds: documentAnalysisRuleIds,
+    },
+    create: {
+      key: 'institutional-default',
+      isActive: true,
+      providerVersion: 'enterprise-24-rules-v1',
+      maxFileSizeBytes: 26_214_400,
+      maxPages: 500,
+      maxTables: 300,
+      minimumTextCharacters: 80,
+      proposalConfidence: 0.7,
+      reviewSlaHours: 72,
+      enabledDocumentTypes: [
+        'STRATEGIC_PLAN',
+        'OPERATIONAL_PLAN',
+        'BUDGET',
+        'POLICY',
+        'REGULATION',
+        'REPORT',
+        'MINUTES',
+        'LETTER',
+        'CONTRACT',
+        'GOVERNANCE',
+        'FINANCIAL',
+        'PROGRAM',
+        'EMPLOYEE',
+        'EDUCATIONAL',
+        'MEDIA',
+        'OTHER',
+      ],
+      enabledRuleIds: documentAnalysisRuleIds,
+    },
+  });
+
   const viewer = await prisma.role.findUniqueOrThrow({ where: { name: 'viewer' } });
   const dashboardPermission = await prisma.permission.findUniqueOrThrow({
     where: { code: 'dashboard.view' },
@@ -350,7 +488,7 @@ async function main() {
 main()
   .then(() =>
     console.log(
-      'Identity, document, and executive permissions, document lookups, metric definitions, and dashboard defaults seeded.',
+      'Identity, document, executive, and document-analysis permissions and safe defaults seeded.',
     ),
   )
   .finally(() => prisma.$disconnect());

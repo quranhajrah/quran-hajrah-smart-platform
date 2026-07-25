@@ -1,5 +1,13 @@
 # Institutional Knowledge Center
 
+## Enterprise 24 integration
+
+Document details show the latest analysis state, proposal count, explicit analyze/reanalyze actions, and a link to the review center. Upload never starts analysis automatically.
+
+Supported analysis inputs are PDFs with embedded text, DOCX, and TXT. Other Knowledge Center files remain valid records but are not falsely reported as extracted. Image-only PDFs are marked `OCR_REQUIRED`, because OCR is not implemented in this release.
+
+The same confidentiality decision is applied to running, viewing, reviewing, approving, importing, and opening source evidence. API responses never expose local storage paths, generated file names, or checksums.
+
 ## Purpose
 
 Enterprise 22 is the first production business module in Quran Hajrah Smart Platform. It manages institutional documents, versions, classifications, access controls, and audit evidence while reusing the existing authentication and RBAC foundation.
