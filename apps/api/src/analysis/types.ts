@@ -96,7 +96,34 @@ export type DocumentExtractionInput = {
   maximumBytes: number;
   maximumPages: number;
   maximumTables: number;
+  reportStage?: (stage: AnalysisPipelineStage) => void;
 };
+
+export const analysisPipelineStages = [
+  'configuration',
+  'file_retrieval',
+  'provider_selection',
+  'pdf_parsing',
+  'text_extraction',
+  'proposal_generation',
+  'page_creation',
+  'proposal_persistence',
+  'job_finalization',
+  'audit',
+] as const;
+
+export type AnalysisPipelineStage = (typeof analysisPipelineStages)[number];
+
+export class AnalysisPipelineError extends Error {
+  readonly name = 'AnalysisPipelineError';
+
+  constructor(
+    readonly stage: AnalysisPipelineStage,
+    readonly originalError: unknown,
+  ) {
+    super(originalError instanceof Error ? originalError.message : String(originalError));
+  }
+}
 
 export type DocumentExtractionResult = {
   provider: string;

@@ -5,6 +5,7 @@ import {
   extractTablesFromMammothHtml,
   normalizeInstitutionalText,
   PdfTextExtractionProvider,
+  repairVisualArabicOrder,
   validateOfficeArchive,
 } from './providers.js';
 import { InstitutionalExtractionService, parseInstitutionalNumber } from './rules.js';
@@ -115,6 +116,15 @@ describe('document text extraction providers', () => {
       'الهدف العام،\nالقيمة ١٬٠٠٠',
     );
     expect(parseInstitutionalNumber('١٢٣٬٤٥٦')).toBe(123456);
+  });
+
+  it('repairs visually reversed institutional Arabic without changing logical Arabic', () => {
+    expect(repairVisualArabicOrder('فدهلا يليغشتلا رشؤملا ةنزاوملا')).toBe(
+      'الهدف التشغيلي المؤشر الموازنة',
+    );
+    expect(repairVisualArabicOrder('الهدف التشغيلي المؤشر الموازنة')).toBe(
+      'الهدف التشغيلي المؤشر الموازنة',
+    );
   });
 
   it('detects image-only content as OCR-required input', () => {

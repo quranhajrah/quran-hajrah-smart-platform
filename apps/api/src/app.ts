@@ -165,17 +165,11 @@ export const createApp = (dependencies: AppDependencies = {}) => {
   app.use('/api', createDocumentRouter(store, documentStore, storage, config));
   app.use(
     '/api',
-    createDocumentAnalysisRouter(store, documentStore, analysisStore, storage, config),
+    createDocumentAnalysisRouter(store, documentStore, analysisStore, storage, config, logger),
   );
   app.use(
     '/api',
-    createExecutiveRouter(
-      store,
-      documentStore,
-      executiveStore,
-      config,
-      executiveAnalysisStore,
-    ),
+    createExecutiveRouter(store, documentStore, executiveStore, config, executiveAnalysisStore),
   );
   app.use('/api', createIdentityRouter(store, config));
   app.use('/api', (_request, _response, next) =>

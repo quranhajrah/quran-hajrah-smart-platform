@@ -101,6 +101,14 @@ export type AnalysisJob = {
   completedAt?: string;
   reviewDueAt?: string;
   failureReason?: string;
+  providerMetadata?: {
+    failure?: {
+      stage?: string;
+      stageLabel?: string;
+      errorCode?: string;
+      diagnosticId?: string;
+    };
+  };
   pageCount: number;
   tableCount: number;
   proposalCount: number;

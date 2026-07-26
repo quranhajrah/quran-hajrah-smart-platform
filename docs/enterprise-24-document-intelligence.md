@@ -106,6 +106,14 @@ npm run document-analysis:alerts
 
 The alert command is scheduler-ready and covers failed jobs, overdue reviews, approved proposals awaiting import, and unresolved conflicts. No in-process cron is enabled.
 
+## Production failure diagnostics
+
+The analysis pipeline emits structured stage events for configuration, file retrieval, provider selection, PDF parsing, text extraction, proposal generation, page/table persistence, proposal persistence, job finalization, and audit. Events contain identifiers, stage, status, counts, provider, and safe exception metadata only. File paths, document text, evidence, credentials, and connection strings are never logged.
+
+Failed jobs return an Arabic stage-specific message and a diagnostic identifier. Authorized audit viewers can correlate that identifier with the sanitized exception, error code, and pipeline stage. Prisma result persistence uses an explicit bounded 15-second acquisition window and 120-second transaction window so multi-page plans can remain atomic over a remote PostgreSQL connection without relying on Prisma's short interactive-transaction default.
+
+Some Arabic PDFs expose text in visual word order. The PDF provider repairs that order only when at least two known institutional headings are detected in reversed form and reversed headings outnumber logical headings. Numeric values are not reversed or rewritten.
+
 ## Known limitations
 
 - No OCR for image-only PDF.

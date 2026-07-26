@@ -6,20 +6,109 @@ import { requireDocumentAccess } from '../documents/security.js';
 import type { StorageProvider } from '../documents/storage.js';
 import type { DocumentStore } from '../documents/store.js';
 import type { DocumentRecord, DocumentVersionRecord } from '../documents/types.js';
+import { createLogger, type Logger } from '../logger.js';
 import { ExtractionProviderRegistry } from './providers.js';
 import { InstitutionalExtractionService } from './rules.js';
 import type { AnalysisStore } from './store.js';
+import { AnalysisPipelineError } from './types.js';
 import type {
   AnalysisListQuery,
+  AnalysisPipelineStage,
   ConflictResult,
   ImportDecision,
   ProposalDecision,
   ProposalListQuery,
 } from './types.js';
 
-const safeFailureReason = (error: unknown) => {
-  if (error instanceof AppError) return error.message;
-  return 'تعذر إكمال تحليل المستند. راجع سلامة الملف ثم أعد المحاولة.';
+const pipelineStageLabels: Record<AnalysisPipelineStage, string> = {
+  configuration: 'تحميل إعدادات التحليل',
+  file_retrieval: 'استرجاع ملف المستند',
+  provider_selection: 'اختيار معالج الملف',
+  pdf_parsing: 'فتح بنية ملف PDF',
+  text_extraction: 'استخراج النص والصفحات',
+  proposal_generation: 'إنشاء المقترحات المؤسسية',
+  page_creation: 'حفظ الصفحات والجداول المستخرجة',
+  proposal_persistence: 'حفظ المقترحات المستخرجة',
+  job_finalization: 'إنهاء مهمة التحليل',
+  audit: 'تسجيل أثر التحليل',
+};
+
+const originalError = (error: unknown) =>
+  error instanceof AnalysisPipelineError ? error.originalError : error;
+
+const safeDiagnosticMessage = (error: unknown) => {
+  const source = originalError(error);
+  const message = source instanceof Error ? source.message : String(source);
+  return message
+    .replace(/postgres(?:ql)?:\/\/[^\s@]+@/gi, 'postgresql://[redacted]@')
+    .replace(/[A-Za-z]:\\[^\s]+/g, '[redacted-path]')
+    .replace(/\/(?:home|var|srv|tmp)\/[^\s]+/g, '/[redacted-path]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 1000);
+};
+
+const failureCode = (error: unknown) => {
+  const source = originalError(error);
+  if (source instanceof AppError) return source.code;
+  const code =
+    source && typeof source === 'object' && 'code' in source
+      ? String((source as { code?: unknown }).code ?? '')
+      : '';
+  if (code === 'P2028') return 'ANALYSIS_PERSISTENCE_TIMEOUT';
+  if (code === 'ENOENT') return 'ANALYSIS_FILE_NOT_FOUND';
+  if (code === 'EACCES' || code === 'EPERM') return 'ANALYSIS_FILE_PERMISSION_DENIED';
+  return code || 'ANALYSIS_INTERNAL_ERROR';
+};
+
+export const analysisFailureDetails = (error: unknown, currentStage: AnalysisPipelineStage) => {
+  const stage = error instanceof AnalysisPipelineError ? error.stage : currentStage;
+  const source = originalError(error);
+  const code = failureCode(error);
+  const diagnosticMessage = safeDiagnosticMessage(error);
+  const diagnosticId = createHash('sha256')
+    .update(`${stage}|${code}|${diagnosticMessage}`)
+    .digest('hex')
+    .slice(0, 12);
+
+  let userMessage: string;
+  if (source instanceof AppError) {
+    userMessage = source.message;
+  } else if (code === 'ANALYSIS_PERSISTENCE_TIMEOUT') {
+    userMessage =
+      'اكتمل استخراج المستند، لكن انتهت مهلة حفظ النتائج في قاعدة البيانات. لم تُحفظ نتائج جزئية، ويمكن إعادة التحليل بأمان.';
+  } else {
+    const messages: Partial<Record<AnalysisPipelineStage, string>> = {
+      configuration:
+        'تعذر تحميل إعدادات تحليل المستند. تحقق من جاهزية قاعدة البيانات ثم أعد المحاولة.',
+      file_retrieval:
+        'تعذر استرجاع ملف المستند من التخزين. تحقق من وجود الملف وصلاحيات مجلد التخزين ثم أعد المحاولة.',
+      provider_selection: 'نوع الملف غير مدعوم بواسطة معالجات التحليل الحالية.',
+      pdf_parsing:
+        'تعذر فتح بنية ملف PDF. قد يحتوي الملف على بنية غير متوافقة أو تلف يحتاج إلى إعادة تصدير.',
+      text_extraction:
+        'تم فتح الملف، لكن تعذر استخراج النص والصفحات منه. أعد تصدير الملف بصيغة PDF نصية ثم حاول مجددًا.',
+      proposal_generation:
+        'تم استخراج صفحات المستند، لكن تعذر إنشاء المقترحات المؤسسية. لم يتم استيراد أي بيانات.',
+      page_creation:
+        'تم استخراج صفحات المستند، لكن تعذر حفظها في قاعدة البيانات. لم تُحفظ نتائج جزئية.',
+      proposal_persistence:
+        'تم استخراج النص، لكن تعذر حفظ المقترحات في قاعدة البيانات. لم تُحفظ نتائج جزئية.',
+      job_finalization: 'اكتمل استخراج المستند، لكن تعذر إنهاء مهمة التحليل في قاعدة البيانات.',
+      audit: 'اكتمل مسار التحليل، لكن تعذر تسجيل أثر العملية.',
+    };
+    userMessage = messages[stage] ?? 'تعذر إكمال تحليل المستند. راجع سلامة الملف ثم أعد المحاولة.';
+  }
+
+  return {
+    stage,
+    stageLabel: pipelineStageLabels[stage],
+    code,
+    diagnosticId,
+    diagnosticMessage,
+    errorName: source instanceof Error ? source.name : 'UnknownError',
+    userMessage: `${userMessage} (معرّف التشخيص: ${diagnosticId})`,
+  };
 };
 
 const readWithinLimit = async (stream: Readable, maximumBytes: number) => {
@@ -47,6 +136,7 @@ export class DocumentAnalysisService {
     private readonly analysisStore: AnalysisStore,
     private readonly documentStore: DocumentStore,
     private readonly storage: StorageProvider,
+    private readonly logger: Logger = createLogger('info'),
     private readonly providers = new ExtractionProviderRegistry(),
     private readonly extractor = new InstitutionalExtractionService(),
   ) {}
@@ -390,19 +480,46 @@ export class DocumentAnalysisService {
   private runInBackground(jobId: string, document: DocumentRecord, version: DocumentVersionRecord) {
     setImmediate(() => {
       void this.process(jobId, document, version).catch((error) => {
-        console.error(
-          JSON.stringify({
-            event: 'document_analysis_background_failure',
-            jobId,
-            errorName: error instanceof Error ? error.name : 'UnknownError',
-          }),
-        );
+        const details = analysisFailureDetails(error, 'job_finalization');
+        this.logger.error({
+          event: 'document_analysis_background_failure',
+          jobId,
+          stage: details.stage,
+          errorName: details.errorName,
+          errorCode: details.code,
+          errorMessage: details.diagnosticMessage,
+          diagnosticId: details.diagnosticId,
+        });
       });
     });
   }
 
   private async process(jobId: string, document: DocumentRecord, version: DocumentVersionRecord) {
+    let stage: AnalysisPipelineStage = 'configuration';
+    const reportStage = (
+      nextStage: AnalysisPipelineStage,
+      status: 'started' | 'completed',
+      metadata?: Record<string, unknown>,
+    ) => {
+      stage = nextStage;
+      this.logger.info({
+        event: 'document_analysis_stage',
+        jobId,
+        stage: nextStage,
+        stageLabel: pipelineStageLabels[nextStage],
+        status,
+        ...metadata,
+      });
+    };
+    const transitionStage = (nextStage: AnalysisPipelineStage) => {
+      if (stage !== nextStage) {
+        reportStage(stage, 'completed');
+        reportStage(nextStage, 'started');
+      }
+    };
+
     try {
+      reportStage('configuration', 'started');
       const configuration = await this.analysisStore.getConfiguration();
       const current = await this.analysisStore.getJob(jobId);
       if (!current || current.status === 'CANCELLED') return;
@@ -411,15 +528,33 @@ export class DocumentAnalysisService {
         startedAt: new Date(),
         failureReason: null,
       });
+      reportStage('configuration', 'completed');
+
+      reportStage('file_retrieval', 'started');
       if (!(await this.storage.exists(version.storagePath))) {
-        throw new AppError(404, 'Document file not found.', 'FILE_NOT_FOUND');
+        throw new AppError(
+          404,
+          'تعذر العثور على ملف المستند في التخزين.',
+          'ANALYSIS_FILE_NOT_FOUND',
+        );
       }
       const stream = await this.storage.read(version.storagePath);
       const data = await readWithinLimit(stream, configuration.maxFileSizeBytes);
+      reportStage('file_retrieval', 'completed', { fileSizeBytes: data.byteLength });
+
+      reportStage('provider_selection', 'started');
       const provider = this.providers.resolve({
         fileName: version.originalFileName,
         mimeType: version.mimeType,
       });
+      reportStage('provider_selection', 'completed', { provider: provider.name });
+
+      const firstExtractionStage: AnalysisPipelineStage =
+        version.mimeType === 'application/pdf' ||
+        version.originalFileName.toLowerCase().endsWith('.pdf')
+          ? 'pdf_parsing'
+          : 'text_extraction';
+      reportStage(firstExtractionStage, 'started', { provider: provider.name });
       const extraction = await provider.extractDocument({
         fileName: version.originalFileName,
         mimeType: version.mimeType,
@@ -427,6 +562,12 @@ export class DocumentAnalysisService {
         maximumBytes: configuration.maxFileSizeBytes,
         maximumPages: configuration.maxPages,
         maximumTables: configuration.maxTables,
+        reportStage: transitionStage,
+      });
+      reportStage(stage, 'completed', {
+        provider: provider.name,
+        pageCount: extraction.pages.length,
+        tableCount: extraction.pages.reduce((total, page) => total + page.tables.length, 0),
       });
       const latest = await this.analysisStore.getJob(jobId);
       if (!latest || latest.status === 'CANCELLED') return;
@@ -452,6 +593,8 @@ export class DocumentAnalysisService {
         });
         return;
       }
+
+      reportStage('proposal_generation', 'started');
       const tables = provider.extractTables(extraction.pages, configuration.maxTables);
       const enabledRules = new Set(configuration.enabledRuleIds);
       const proposals = this.extractor
@@ -461,6 +604,9 @@ export class DocumentAnalysisService {
             enabledRules.has(proposal.extractionRuleId) &&
             proposal.confidence >= configuration.proposalConfidence,
         );
+      reportStage('proposal_generation', 'completed', { proposalCount: proposals.length });
+
+      reportStage('page_creation', 'started');
       await this.analysisStore.saveExtraction(jobId, {
         provider: extraction.provider,
         providerVersion: extraction.providerVersion,
@@ -468,7 +614,11 @@ export class DocumentAnalysisService {
         metadata: extraction.metadata,
         pages: extraction.pages,
         proposals,
+        reportStage: transitionStage,
       });
+      reportStage(stage, 'completed');
+
+      reportStage('audit', 'started');
       await this.analysisStore.createAudit({
         jobId,
         action: 'ANALYSIS_COMPLETED',
@@ -479,31 +629,62 @@ export class DocumentAnalysisService {
           proposalCount: proposals.length,
         },
       });
+      reportStage('audit', 'completed');
     } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: 'document_analysis_failed',
-          jobId,
-          errorName: error instanceof Error ? error.name : 'UnknownError',
-          errorCode: error instanceof AppError ? error.code : 'INTERNAL_ERROR',
-        }),
-      );
+      const details = analysisFailureDetails(error, stage);
+      this.logger.error({
+        event: 'document_analysis_failed',
+        jobId,
+        stage: details.stage,
+        stageLabel: details.stageLabel,
+        errorName: details.errorName,
+        errorCode: details.code,
+        errorMessage: details.diagnosticMessage,
+        diagnosticId: details.diagnosticId,
+      });
       const current = await this.analysisStore.getJob(jobId);
       if (current?.status !== 'CANCELLED') {
         await this.analysisStore.updateJob(jobId, {
           status: 'FAILED',
           completedAt: new Date(),
-          failureReason: safeFailureReason(error),
-        });
-        await this.analysisStore.createAudit({
-          jobId,
-          action: 'ANALYSIS_FAILED',
-          description: 'Document analysis failed.',
-          metadata: {
-            errorCode: error instanceof AppError ? error.code : 'INTERNAL_ERROR',
+          failureReason: details.userMessage,
+          providerMetadata: {
+            failure: {
+              stage: details.stage,
+              stageLabel: details.stageLabel,
+              errorCode: details.code,
+              diagnosticId: details.diagnosticId,
+            },
           },
         });
+        try {
+          await this.analysisStore.createAudit({
+            jobId,
+            action: 'ANALYSIS_FAILED',
+            description: 'Document analysis failed at a recorded pipeline stage.',
+            metadata: {
+              stage: details.stage,
+              stageLabel: details.stageLabel,
+              errorName: details.errorName,
+              errorCode: details.code,
+              errorMessage: details.diagnosticMessage,
+              diagnosticId: details.diagnosticId,
+            },
+          });
+        } catch (auditError) {
+          const auditDetails = analysisFailureDetails(auditError, 'audit');
+          this.logger.error({
+            event: 'document_analysis_failure_audit_failed',
+            jobId,
+            stage: 'audit',
+            errorName: auditDetails.errorName,
+            errorCode: auditDetails.code,
+            errorMessage: auditDetails.diagnosticMessage,
+            diagnosticId: auditDetails.diagnosticId,
+          });
+        }
       }
+      throw error;
     }
   }
 

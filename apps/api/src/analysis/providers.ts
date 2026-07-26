@@ -1,6 +1,5 @@
 import path from 'node:path';
 import mammoth from 'mammoth';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { AppError } from '../http.js';
 import type {
   DocumentExtractionInput,
@@ -15,16 +14,43 @@ const pdfMime = 'application/pdf';
 const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const textMimes = new Set(['text/plain']);
 
+const institutionalArabicMarkers = [
+  'الهدف',
+  'المؤشر',
+  'الموازنة',
+  'المسؤول',
+  'المبادرة',
+  'تاريخ',
+  'الفئة',
+  'الإجمالي',
+];
+const reverseCharacters = (value: string) => [...value].reverse().join('');
+
+export const repairVisualArabicOrder = (input: string) => {
+  const normalMarkers = institutionalArabicMarkers.filter((marker) =>
+    input.includes(marker),
+  ).length;
+  const reversedMarkers = institutionalArabicMarkers.filter((marker) =>
+    input.includes(reverseCharacters(marker)),
+  ).length;
+  if (reversedMarkers <= normalMarkers || reversedMarkers < 2) return input;
+  return input
+    .replace(/[\u0600-\u06ff]+/g, reverseCharacters)
+    .replace(/(^|\s):([\u0600-\u06ff]+)/gm, '$1$2:');
+};
+
 export const normalizeInstitutionalText = (input: string) =>
-  input
-    .normalize('NFC')
-    .replaceAll('\u00a0', ' ')
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .map((line) => line.replace(/[ \t\f\v]+/g, ' ').trim())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  repairVisualArabicOrder(
+    input
+      .normalize('NFC')
+      .replaceAll('\u00a0', ' ')
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((line) => line.replace(/[ \t\f\v]+/g, ' ').trim())
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
+  );
 
 const ensureLimits = (input: DocumentExtractionInput) => {
   if (input.data.byteLength === 0) {
@@ -138,10 +164,16 @@ export class PdfTextExtractionProvider implements DocumentTextExtractionProvider
   async extractPages(input: DocumentExtractionInput) {
     ensureLimits(input);
     try {
+      input.reportStage?.('pdf_parsing');
+      // Keep the sizeable parser off the server startup path. Hostinger must be
+      // able to listen immediately; PDF.js is loaded only for an explicit job.
+      const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
       const task = getDocument({
         data: new Uint8Array(input.data),
         useSystemFonts: true,
-        stopAtErrors: true,
+        // Real institutional PDFs frequently contain recoverable font/xref defects.
+        // PDF.js remains responsible for rejecting genuinely unreadable documents.
+        stopAtErrors: false,
       });
       const pdf = await task.promise;
       if (pdf.numPages > input.maximumPages) {
@@ -154,6 +186,7 @@ export class PdfTextExtractionProvider implements DocumentTextExtractionProvider
       }
       const pages: ExtractedPageData[] = [];
       let remainingTables = input.maximumTables;
+      input.reportStage?.('text_extraction');
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
         const page = await pdf.getPage(pageNumber);
         const viewport = page.getViewport({ scale: 1 });
@@ -287,6 +320,7 @@ export class DocxTextExtractionProvider implements DocumentTextExtractionProvide
     ensureLimits(input);
     validateOfficeArchive(input.data, input.maximumBytes);
     try {
+      input.reportStage?.('text_extraction');
       const [textResult, htmlResult] = await Promise.all([
         mammoth.extractRawText({ buffer: input.data }),
         mammoth.convertToHtml(
@@ -342,6 +376,7 @@ export class TxtTextExtractionProvider implements DocumentTextExtractionProvider
 
   async extractPages(input: DocumentExtractionInput) {
     ensureLimits(input);
+    input.reportStage?.('text_extraction');
     if (input.data.subarray(0, Math.min(input.data.length, 4096)).includes(0)) {
       throw new AppError(422, 'ملف TXT لا يحتوي نصًا صالحًا.', 'ANALYSIS_TEXT_MALFORMED');
     }

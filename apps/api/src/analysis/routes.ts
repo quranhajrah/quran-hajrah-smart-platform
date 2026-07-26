@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { AppConfig } from '../config.js';
 import { asyncRoute, requireAuth, requirePermission, validate } from '../http.js';
 import type { IdentityStore } from '../identity/store.js';
+import { createLogger, type Logger } from '../logger.js';
 import type { StorageProvider } from '../documents/storage.js';
 import type { DocumentStore } from '../documents/store.js';
 import { documentTypes } from '../documents/types.js';
@@ -120,10 +121,11 @@ export const createDocumentAnalysisRouter = (
   analysisStore: AnalysisStore,
   storage: StorageProvider,
   config: AppConfig,
+  logger: Logger = createLogger(config.logLevel),
 ) => {
   const router = Router();
   const authenticated = requireAuth(identityStore, config);
-  const service = new DocumentAnalysisService(analysisStore, documentStore, storage);
+  const service = new DocumentAnalysisService(analysisStore, documentStore, storage, logger);
   const analysisLimiter = rateLimit({
     windowMs: 60_000,
     limit: 10,

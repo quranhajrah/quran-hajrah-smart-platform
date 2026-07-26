@@ -1,10 +1,12 @@
 import { Prisma } from '@prisma/client';
 import { database } from '@quran-hajrah/database';
 import type { AnalysisAuditInput, AnalysisStore, SaveExtractionInput } from './store.js';
+import { AnalysisPipelineError } from './types.js';
 import type {
   AnalysisConfigurationRecord,
   AnalysisJobRecord,
   AnalysisListQuery,
+  AnalysisPipelineStage,
   AnalysisPageRecord,
   AnalysisTableRecord,
   ConflictAction,
@@ -43,6 +45,11 @@ const prismaJson = (value: unknown) => value as Prisma.InputJsonValue;
 const optionalPrismaJson = (value: unknown) =>
   value === undefined || value === null ? undefined : prismaJson(value);
 const asDate = (value: unknown) => (value instanceof Date ? value : new Date(String(value)));
+
+export const analysisPersistenceTransactionOptions = {
+  maxWait: 15_000,
+  timeout: 120_000,
+} as const;
 
 const mapConfiguration = (record: {
   id: string;
@@ -822,105 +829,121 @@ export class PrismaAnalysisStore implements AnalysisStore {
   }
 
   async saveExtraction(jobId: string, input: SaveExtractionInput) {
-    return database.$transaction(async (transaction) => {
-      const job = await transaction.documentAnalysisJob.findUniqueOrThrow({
-        where: { id: jobId },
-      });
-      await transaction.extractionProposal.deleteMany({ where: { jobId } });
-      await transaction.documentPage.deleteMany({ where: { jobId } });
-      for (const page of input.pages) {
-        await transaction.documentPage.create({
-          data: {
-            jobId,
-            documentId: job.documentId,
-            pageNumber: page.pageNumber,
-            hasEmbeddedText: page.hasEmbeddedText,
-            textLength: page.text.length,
-            extractionQuality: page.quality,
-            width: page.width,
-            height: page.height,
-            extractedText: {
-              create: {
-                normalizedText: page.text,
-                characterCount: page.text.length,
-                extractionMethod: input.extractionMethod,
-                extractionVersion: input.providerVersion,
+    let stage: AnalysisPipelineStage = 'page_creation';
+    const reportStage = (nextStage: AnalysisPipelineStage) => {
+      stage = nextStage;
+      input.reportStage?.(nextStage);
+    };
+
+    try {
+      return await database.$transaction(async (transaction) => {
+        const job = await transaction.documentAnalysisJob.findUniqueOrThrow({
+          where: { id: jobId },
+        });
+        await transaction.extractionProposal.deleteMany({ where: { jobId } });
+        await transaction.documentPage.deleteMany({ where: { jobId } });
+
+        reportStage('page_creation');
+        for (const page of input.pages) {
+          await transaction.documentPage.create({
+            data: {
+              jobId,
+              documentId: job.documentId,
+              pageNumber: page.pageNumber,
+              hasEmbeddedText: page.hasEmbeddedText,
+              textLength: page.text.length,
+              extractionQuality: page.quality,
+              width: page.width,
+              height: page.height,
+              extractedText: {
+                create: {
+                  normalizedText: page.text,
+                  characterCount: page.text.length,
+                  extractionMethod: input.extractionMethod,
+                  extractionVersion: input.providerVersion,
+                },
+              },
+              tables: {
+                create: page.tables.map((table) => ({
+                  jobId,
+                  tableIndex: table.tableIndex,
+                  title: table.title,
+                  sourceSection: table.sourceSection,
+                  rowCount: table.rows.length,
+                  columnCount: Math.max(0, ...table.rows.map((row) => row.length)),
+                  extractionMethod: table.extractionMethod,
+                  confidence: table.confidence,
+                  cells: {
+                    create: table.rows.flatMap((row, rowIndex) =>
+                      row.map((text, columnIndex) => ({
+                        rowIndex,
+                        columnIndex,
+                        text,
+                      })),
+                    ),
+                  },
+                })),
               },
             },
-            tables: {
-              create: page.tables.map((table) => ({
-                jobId,
-                tableIndex: table.tableIndex,
-                title: table.title,
-                sourceSection: table.sourceSection,
-                rowCount: table.rows.length,
-                columnCount: Math.max(0, ...table.rows.map((row) => row.length)),
-                extractionMethod: table.extractionMethod,
-                confidence: table.confidence,
-                cells: {
-                  create: table.rows.flatMap((row, rowIndex) =>
-                    row.map((text, columnIndex) => ({
-                      rowIndex,
-                      columnIndex,
-                      text,
-                    })),
-                  ),
-                },
-              })),
+          });
+        }
+
+        reportStage('proposal_persistence');
+        for (const proposal of input.proposals) {
+          await transaction.extractionProposal.create({
+            data: {
+              jobId,
+              documentId: job.documentId,
+              documentVersionId: job.documentVersionId,
+              proposalType: proposal.proposalType,
+              title: proposal.title,
+              proposedData: prismaJson(proposal.proposedData),
+              importTargetType: proposal.importTargetType,
+              extractionRuleId: proposal.extractionRuleId,
+              extractionMethod: proposal.extractionMethod,
+              confidence: proposal.confidence,
+              sourcePage: proposal.sourcePage,
+              sourceSection: proposal.sourceSection,
+              evidenceSnippet: proposal.evidenceSnippet,
+              fields: {
+                create: proposal.fields.map((proposalField, sortOrder) => ({
+                  key: proposalField.key,
+                  labelAr: proposalField.labelAr,
+                  dataType: proposalField.dataType,
+                  value: optionalPrismaJson(proposalField.value),
+                  sourceValue: proposalField.sourceValue,
+                  confidence: proposalField.confidence,
+                  sortOrder,
+                })),
+              },
             },
-          },
-        });
-      }
-      for (const proposal of input.proposals) {
-        await transaction.extractionProposal.create({
-          data: {
-            jobId,
-            documentId: job.documentId,
-            documentVersionId: job.documentVersionId,
-            proposalType: proposal.proposalType,
-            title: proposal.title,
-            proposedData: prismaJson(proposal.proposedData),
-            importTargetType: proposal.importTargetType,
-            extractionRuleId: proposal.extractionRuleId,
-            extractionMethod: proposal.extractionMethod,
-            confidence: proposal.confidence,
-            sourcePage: proposal.sourcePage,
-            sourceSection: proposal.sourceSection,
-            evidenceSnippet: proposal.evidenceSnippet,
-            fields: {
-              create: proposal.fields.map((proposalField, sortOrder) => ({
-                key: proposalField.key,
-                labelAr: proposalField.labelAr,
-                dataType: proposalField.dataType,
-                value: optionalPrismaJson(proposalField.value),
-                sourceValue: proposalField.sourceValue,
-                confidence: proposalField.confidence,
-                sortOrder,
-              })),
+          });
+        }
+
+        reportStage('job_finalization');
+        const tableCount = input.pages.reduce((sum, page) => sum + page.tables.length, 0);
+        return mapJob(
+          await transaction.documentAnalysisJob.update({
+            where: { id: jobId },
+            data: {
+              extractionProvider: input.provider,
+              extractionVersion: input.providerVersion,
+              extractionMethod: input.extractionMethod,
+              providerMetadata: prismaJson(input.metadata),
+              pageCount: input.pages.length,
+              tableCount,
+              proposalCount: input.proposals.length,
+              status: input.proposals.length > 0 ? 'PROPOSALS_READY' : 'TEXT_EXTRACTED',
+              completedAt: new Date(),
+              failureReason: null,
             },
-          },
-        });
-      }
-      const tableCount = input.pages.reduce((sum, page) => sum + page.tables.length, 0);
-      return mapJob(
-        await transaction.documentAnalysisJob.update({
-          where: { id: jobId },
-          data: {
-            extractionProvider: input.provider,
-            extractionVersion: input.providerVersion,
-            extractionMethod: input.extractionMethod,
-            providerMetadata: prismaJson(input.metadata),
-            pageCount: input.pages.length,
-            tableCount,
-            proposalCount: input.proposals.length,
-            status: input.proposals.length > 0 ? 'PROPOSALS_READY' : 'TEXT_EXTRACTED',
-            completedAt: new Date(),
-            failureReason: null,
-          },
-          include: jobInclude,
-        }),
-      );
-    });
+            include: jobInclude,
+          }),
+        );
+      }, analysisPersistenceTransactionOptions);
+    } catch (error) {
+      throw new AnalysisPipelineError(stage, error);
+    }
   }
 
   async clearJobForRetry(jobId: string) {

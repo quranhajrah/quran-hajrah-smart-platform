@@ -442,6 +442,15 @@ export function DocumentAnalysisReview() {
         </div>
       </div>
       {job.failureReason && <StatusMessage error>{job.failureReason}</StatusMessage>}
+      {job.providerMetadata?.failure && (
+        <div className="status-message analysis-failure-details" role="status">
+          <strong>مرحلة الفشل: {job.providerMetadata.failure.stageLabel ?? 'غير محددة'}</strong>
+          <span>
+            الرمز: {job.providerMetadata.failure.errorCode ?? 'غير متاح'} · معرّف التشخيص:{' '}
+            {job.providerMetadata.failure.diagnosticId ?? 'غير متاح'}
+          </span>
+        </div>
+      )}
       {error && <StatusMessage error>{error}</StatusMessage>}
 
       <section className="document-panel">

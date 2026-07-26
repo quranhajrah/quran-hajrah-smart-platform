@@ -4,6 +4,13 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- Added stage-aware production diagnostics for document retrieval, PDF parsing, text extraction, proposal generation, page persistence, and finalization without logging document contents.
+- Prevented large multi-page analysis results from exceeding Prisma's default interactive-transaction window while preserving atomic rollback.
+- Allowed PDF.js to recover from non-fatal structural defects and repaired visually reversed Arabic institutional headings only when safely detected.
+- Added a generated operational-plan PDF integration fixture covering page extraction and evidence-backed proposal generation without committing private association documents.
+
 ## [24.0.0] - 2026-07-25
 
 ### Enterprise 24 Institutional Document Intelligence Engine

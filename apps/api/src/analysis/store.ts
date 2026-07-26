@@ -14,6 +14,7 @@ import type {
   ProposalListQuery,
   ProposalRecord,
   SourceEvidenceRecord,
+  AnalysisPipelineStage,
 } from './types.js';
 
 export type SaveExtractionInput = {
@@ -38,6 +39,7 @@ export type SaveExtractionInput = {
     }>;
   }>;
   proposals: ExtractionProposalCandidate[];
+  reportStage?: (stage: AnalysisPipelineStage) => void;
 };
 
 export type AnalysisAuditInput = RequestMeta & {
