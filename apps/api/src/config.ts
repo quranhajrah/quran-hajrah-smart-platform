@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import path from 'node:path';
 
 export type SameSite = 'lax' | 'strict' | 'none';
@@ -69,6 +70,34 @@ const validateOrigin = (name: string, origin: string) => {
   } catch {
     throw new Error(`${name} must be an absolute HTTP(S) origin without a path.`);
   }
+};
+
+type DocumentStorageRootOptions = {
+  isProduction: boolean;
+  configured?: string;
+  workingDirectory?: string;
+  homeDirectory?: string;
+};
+
+export const resolveDocumentStorageRoot = ({
+  isProduction,
+  configured,
+  workingDirectory = process.cwd(),
+  homeDirectory = homedir(),
+}: DocumentStorageRootOptions) => {
+  const selected = configured?.trim();
+  if (selected) {
+    if (isProduction && !path.isAbsolute(selected)) {
+      throw new Error('DOCUMENT_STORAGE_ROOT must be an absolute path in production.');
+    }
+    return path.resolve(workingDirectory, selected);
+  }
+
+  if (!isProduction) return path.resolve(workingDirectory, '.data', 'documents');
+  if (!path.isAbsolute(homeDirectory)) {
+    throw new Error('The production user home directory must be an absolute path.');
+  }
+  return path.resolve(homeDirectory, '.quran-hajrah-smart-platform', 'documents');
 };
 
 export const loadConfig = (): AppConfig => {
@@ -161,9 +190,10 @@ export const loadConfig = (): AppConfig => {
     rateLimitMax: positiveNumber('RATE_LIMIT_MAX', value('RATE_LIMIT_MAX', isProduction, '300')),
     adminDistPath: path.resolve(process.cwd(), 'apps/admin/dist'),
     portalDistPath: path.resolve(process.cwd(), 'apps/portal/dist'),
-    documentStorageRoot: path.resolve(
-      process.env.DOCUMENT_STORAGE_ROOT?.trim() || path.join(process.cwd(), '.data', 'documents'),
-    ),
+    documentStorageRoot: resolveDocumentStorageRoot({
+      isProduction,
+      configured: process.env.DOCUMENT_STORAGE_ROOT,
+    }),
     documentMaxFileSizeBytes:
       positiveNumber('DOCUMENT_MAX_FILE_SIZE_MB', process.env.DOCUMENT_MAX_FILE_SIZE_MB ?? '25') *
       1024 *

@@ -8,7 +8,7 @@
 - [ ] Enter all values from `environment-checklist.md` in hPanel.
 - [ ] Run `npm run db:status` and `npm run db:diagnostics` from an approved secure environment.
 - [ ] Confirm `postbuild:production` will run `db:deploy`, `db:seed`, then the conditional administrator bootstrap in that order.
-- [ ] Provision and test the persistent non-public `DOCUMENT_STORAGE_ROOT`.
+- [ ] Provision and test the persistent non-public document root; confirm the startup `document_storage_configuration` event does not point inside `public_html` or a deployment build.
 - [ ] For the first administrator only, add `ADMIN_BOOTSTRAP_ENABLED=true`, `ADMIN_EMAIL`, `ADMIN_FULL_NAME`, and `ADMIN_TEMP_PASSWORD` through hPanel.
 - [ ] Confirm the temporary password meets the 12-character uppercase/lowercase/number/special-character policy.
 
@@ -41,6 +41,7 @@
 - [ ] Confirm runtime logs are structured and contain no credentials.
 - [ ] Open the Knowledge Center, upload an approved test PDF, download it, add a version, archive it, restore it, and verify its audit history.
 - [ ] Confirm binary files persist after a controlled redeploy.
+- [ ] Upload, download, analyze, and delete an approved test file across a controlled redeploy using the same relative database path.
 - [ ] Confirm migration `20260724_enterprise_23_executive_intelligence` is applied in the build log.
 - [ ] Confirm the authenticated landing route displays the Executive Dashboard without fabricated values.
 - [ ] Verify server-side RBAC denial with a read-only role and allow the same action with an authorized executive role.

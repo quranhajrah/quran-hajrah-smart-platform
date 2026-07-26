@@ -24,7 +24,7 @@ Enter values through Hostinger hPanel. Hostinger documents that deployment envir
 - [ ] `RATE_LIMIT_WINDOW_MS=60000`
 - [ ] `RATE_LIMIT_MAX=300`
 - [ ] `BCRYPT_ROUNDS=12`
-- [ ] `DOCUMENT_STORAGE_ROOT` points to a writable, persistent, non-public directory
+- [ ] `DOCUMENT_STORAGE_ROOT` is either unset to use `~/.quran-hajrah-smart-platform/documents`, or is an absolute writable, persistent, non-public directory outside `public_html` and deployment builds
 - [ ] `DOCUMENT_MAX_FILE_SIZE_MB=25` or the approved operational limit
 
 ## First administrator, one deployment only

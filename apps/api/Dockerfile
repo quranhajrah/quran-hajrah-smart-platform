@@ -24,5 +24,8 @@ COPY --from=build /app/packages/database/dist ./packages/database/dist
 COPY --from=build /app/packages/database/prisma ./packages/database/prisma
 COPY --from=build /app/packages/database/package.json ./packages/database/package.json
 COPY --from=build /app/package.json ./package.json
+RUN mkdir -p /home/node/.quran-hajrah-smart-platform/documents \
+    && chown -R node:node /home/node/.quran-hajrah-smart-platform
+VOLUME ["/home/node/.quran-hajrah-smart-platform/documents"]
 USER node
 CMD ["npm", "run", "start:production"]

@@ -60,7 +60,9 @@ Metric definitions, targets, and measurements are separate records. The seed cre
 
 ## Institutional Knowledge Center
 
-Document metadata, versions, tags, access rules, and audit history are stored in PostgreSQL. Binary files are handled through the `StorageProvider` contract. Enterprise 22 uses `LocalStorageProvider`; `DOCUMENT_STORAGE_ROOT` must point to a persistent directory outside the public web root. The database stores only relative provider paths. API DTOs omit storage paths, generated names, and checksums.
+Document metadata, versions, tags, access rules, and audit history are stored in PostgreSQL. Binary files are handled through one `StorageProvider` instance shared by Knowledge Center download and Enterprise 24 analysis. Enterprise 22 uses `LocalStorageProvider`; the database stores only relative provider paths, while production resolves the provider root to `DOCUMENT_STORAGE_ROOT` or the stable fallback `~/.quran-hajrah-smart-platform/documents`. Explicit production paths must be absolute and outside public/deployment directories. API DTOs omit storage paths, generated names, and checksums.
+
+Deployment releases are replaceable and must not own uploaded binaries. A startup `document_storage_configuration` record identifies the effective local root and whether it came from the environment or the production user-home fallback. Docker Compose mounts a dedicated `document_storage` volume at that same user-home location.
 
 The upload route accepts a bounded binary body after authentication. It validates MIME type, extension, and file signature, generates an opaque name, enforces root containment, and writes with private file permissions. If database persistence fails, the newly written file is removed. Archive and delete operations are logical and do not erase version binaries automatically.
 

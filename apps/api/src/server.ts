@@ -51,6 +51,16 @@ const start = async () => {
 
   const config = configModule.loadConfig();
   const logger = loggerModule.createLogger(config.logLevel);
+  logger.info({
+    event: 'document_storage_configuration',
+    provider: 'local',
+    root: config.documentStorageRoot,
+    source: process.env.DOCUMENT_STORAGE_ROOT?.trim()
+      ? 'process.env'
+      : config.isProduction
+        ? 'production_user_home'
+        : 'development_working_directory',
+  });
   const app = appModule.createApp({ config, logger });
   const server = app.listen(port, host);
 

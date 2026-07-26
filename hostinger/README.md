@@ -53,7 +53,9 @@ After success, remove `ADMIN_TEMP_PASSWORD`, `ADMIN_EMAIL`, and `ADMIN_FULL_NAME
 
 ## Enterprise 22 document storage
 
-Set `DOCUMENT_STORAGE_ROOT` to a persistent Hostinger directory that is writable by the Node.js process and is not publicly served. Do not place it below an exposed static/public directory. The application creates document-specific subdirectories and opaque file names at runtime. Set `DOCUMENT_MAX_FILE_SIZE_MB` to the approved upload limit (25 by default).
+Binary documents must never live inside Hostinger's deployment/build directory. In production, an unset `DOCUMENT_STORAGE_ROOT` now resolves to the stable user-home path `~/.quran-hajrah-smart-platform/documents`; it no longer resolves below the current working directory. An explicit value must be an absolute, writable, persistent, non-public path. Do not place it below `public_html` or any release/build directory. The application logs a `document_storage_configuration` event at startup with the effective root and its source, without logging document names or contents.
+
+The database stores relative provider paths, so changing the root does not rewrite metadata. Files uploaded under the old release-local default are not recreated automatically: restore their original relative paths from the coordinated storage backup into the effective root, or re-upload the approved source documents. Confirm download and analysis before removing any recoverable old deployment. Set `DOCUMENT_MAX_FILE_SIZE_MB` to the approved upload limit (25 by default).
 
 The PostgreSQL backup and file-storage backup form one recovery unit. Back up both on a coordinated schedule, encrypt exports, restrict operator access, and test restoration outside production. A database restore without matching files leaves version metadata whose binaries are unavailable; a file restore without the matching database leaves unreferenced files.
 

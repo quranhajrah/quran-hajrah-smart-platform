@@ -4,7 +4,7 @@ import path from 'node:path';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp, type ReadinessChecks } from './app.js';
-import { loadConfig, type AppConfig } from './config.js';
+import { loadConfig, resolveDocumentStorageRoot, type AppConfig } from './config.js';
 
 const temporaryDirectories: string[] = [];
 const config = (overrides: Partial<AppConfig> = {}): AppConfig => ({
@@ -102,6 +102,40 @@ describe('production runtime', () => {
     stubProductionEnvironment();
     vi.stubEnv('TRUST_PROXY', 'true');
     expect(loadConfig().trustProxy).toBe(1);
+  });
+
+  it('uses a stable user-home storage root across production deployment directories', () => {
+    const homeDirectory = path.resolve('hostinger-user-home');
+    const firstRoot = resolveDocumentStorageRoot({
+      isProduction: true,
+      workingDirectory: path.resolve('public_html', 'builds', 'release-a'),
+      homeDirectory,
+    });
+    const secondRoot = resolveDocumentStorageRoot({
+      isProduction: true,
+      workingDirectory: path.resolve('public_html', 'builds', 'release-b'),
+      homeDirectory,
+    });
+
+    expect(firstRoot).toBe(
+      path.join(homeDirectory, '.quran-hajrah-smart-platform', 'documents'),
+    );
+    expect(secondRoot).toBe(firstRoot);
+  });
+
+  it('requires an absolute configured storage root in production', () => {
+    expect(() =>
+      resolveDocumentStorageRoot({
+        isProduction: true,
+        configured: '.data/documents',
+      }),
+    ).toThrow('DOCUMENT_STORAGE_ROOT must be an absolute path in production.');
+    expect(
+      resolveDocumentStorageRoot({
+        isProduction: true,
+        configured: path.resolve('persistent-documents'),
+      }),
+    ).toBe(path.resolve('persistent-documents'));
   });
 
   it('reports liveness without querying the database', async () => {

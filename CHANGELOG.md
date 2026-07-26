@@ -6,6 +6,7 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ### Fixed
 
+- Moved the production document-storage fallback out of replaceable deployment directories into the application user's persistent home, rejected relative production roots, and added cross-release upload/retrieve/analyze/delete coverage.
 - Added stage-aware production diagnostics for document retrieval, PDF parsing, text extraction, proposal generation, page persistence, and finalization without logging document contents.
 - Prevented large multi-page analysis results from exceeding Prisma's default interactive-transaction window while preserving atomic rollback.
 - Allowed PDF.js to recover from non-fatal structural defects and repaired visually reversed Arabic institutional headings only when safely detected.
