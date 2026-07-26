@@ -161,13 +161,15 @@ export const detectInstitutionalSections = (
   return sections;
 };
 
-type SemanticLine = {
+export type SemanticLine = {
   text: string;
+  evidence: string;
   normalized: string;
   pageNumber: number;
   lineIndex: number;
   position: number;
   section?: string;
+  sourceLineIndexes: number[];
 };
 
 const semanticLines = (
@@ -187,13 +189,155 @@ const semanticLines = (
       .filter(Boolean)
       .map((text, lineIndex) => ({
         text,
+        evidence: text,
         normalized: matchText(text),
         pageNumber: page.pageNumber,
         lineIndex,
         position: page.pageNumber * 10_000 + lineIndex,
         section: sectionByLine.get(`${page.pageNumber}:${lineIndex}`),
+        sourceLineIndexes: [lineIndex],
       })),
   );
+};
+
+const logicalLabelPattern =
+  /^(?:الهدف\s+(?:الفرعي|التشغيلي)(?:\s+(?:الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|\d+))?|الهدف\s*(?:رقم)?\s*\d+|المؤشر|مؤشر\s+(?:الانجاز|الاداء)|معيار\s+القياس|المبادرة|المشروع|البرنامج|النشاط|خطة\s+العمل|الاجراء\s+التنفيذي|المسؤول\s+عن\s+التنفيذ|الجهة\s+المسؤولة|الادارة\s+المسؤولة|تاريخ\s+البدء|تاريخ\s+الانتهاء|الفئة\s+المستهدفة|العدد|اجمالي\s+(?:الموازنة|الميزانية|التكلفة)|الموازنة\s+المقترحة|الاجمالي|المجموع)\s*[:-]?$/u;
+const logicalNumberPattern = /^[0-9٠-٩۰-۹][0-9٠-٩۰-۹٬,.\s]*(?:ريال|ر\.?\s*س|SAR)?$/iu;
+const logicalBeneficiaryGroupPattern =
+  /^(?:من\s+كبار\s+السن|طالب(?:ا|ًا|اً)?\s*وطالبة|معلم(?:ا|ًا|اً)?\s*ومعلمة|طلاب|طالبات|طالب(?:ا|ًا|اً)?|طالبة|معلمون|معلمات|رجل(?:ا|ًا|اً)?|امرأة)$/u;
+const logicalCompositeLabelPattern =
+  /^(?:الموازنة\s+المقترحة|مؤشرات\s+الانجاز|المسؤول\s+عن\s+التنفيذ|تاريخ\s+البدء|تاريخ\s+الانتهاء|الفئة\s+المستهدفة|خطة\s+العمل)$/u;
+const logicalBudgetLabelPattern =
+  /^(?:اجمالي\s+(?:الموازنة|الميزانية|التكلفة)|الموازنة\s+المقترحة|الاجمالي|المجموع)$/u;
+
+const combineLogicalLines = (
+  source: SemanticLine[],
+  normalized: string,
+  evidence: string,
+): SemanticLine => ({
+  text: normalized,
+  evidence,
+  normalized,
+  pageNumber: source[0]!.pageNumber,
+  lineIndex: source[0]!.lineIndex,
+  position: source[0]!.position,
+  section: source.find((line) => line.section)?.section,
+  sourceLineIndexes: source.flatMap((line) => line.sourceLineIndexes),
+});
+
+/**
+ * Builds evidence-preserving logical records from fragmented PDF lines.
+ * Raw page text remains unchanged; only the in-memory semantic view is joined.
+ */
+export const assembleLogicalLines = (lines: SemanticLine[]) => {
+  const output: SemanticLine[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const current = lines[index]!;
+    const next = lines[index + 1];
+    const third = lines[index + 2];
+    if (!next || next.pageNumber !== current.pageNumber) {
+      output.push(current);
+      continue;
+    }
+
+    const currentNormalized = matchText(current.text);
+    const nextNormalized = matchText(next.text);
+    const joinedLabel = matchText(`${current.text} ${next.text}`);
+    if (
+      logicalCompositeLabelPattern.test(joinedLabel) &&
+      third?.pageNumber === current.pageNumber &&
+      !logicalLabelPattern.test(matchText(third.text))
+    ) {
+      output.push(
+        combineLogicalLines(
+          [current, next, third],
+          `${joinedLabel}: ${matchText(third.text)}`,
+          `${current.text} | ${next.text} | ${third.text}`,
+        ),
+      );
+      index += 2;
+      continue;
+    }
+
+    if (
+      logicalNumberPattern.test(currentNormalized) &&
+      logicalBeneficiaryGroupPattern.test(nextNormalized)
+    ) {
+      output.push(
+        combineLogicalLines(
+          [current, next],
+          `${currentNormalized} ${nextNormalized}`,
+          `${current.text} | ${next.text}`,
+        ),
+      );
+      index += 1;
+      continue;
+    }
+    if (
+      logicalBeneficiaryGroupPattern.test(currentNormalized) &&
+      logicalNumberPattern.test(nextNormalized)
+    ) {
+      output.push(
+        combineLogicalLines(
+          [current, next],
+          `${nextNormalized} ${currentNormalized}`,
+          `${current.text} | ${next.text}`,
+        ),
+      );
+      index += 1;
+      continue;
+    }
+
+    if (
+      logicalNumberPattern.test(currentNormalized) &&
+      logicalBudgetLabelPattern.test(nextNormalized)
+    ) {
+      output.push(
+        combineLogicalLines(
+          [current, next],
+          `${nextNormalized}: ${currentNormalized}`,
+          `${current.text} | ${next.text}`,
+        ),
+      );
+      index += 1;
+      continue;
+    }
+
+    if (
+      logicalLabelPattern.test(currentNormalized) &&
+      !logicalLabelPattern.test(nextNormalized) &&
+      !sectionHeading(next.text)
+    ) {
+      output.push(
+        combineLogicalLines(
+          [current, next],
+          `${currentNormalized.replace(/[:-]\s*$/u, '')}: ${nextNormalized}`,
+          `${current.text} | ${next.text}`,
+        ),
+      );
+      index += 1;
+      continue;
+    }
+
+    if (
+      logicalLabelPattern.test(nextNormalized) &&
+      meaningfulTitle(current.text) &&
+      !sectionHeading(current.text)
+    ) {
+      output.push(
+        combineLogicalLines(
+          [current, next],
+          `${nextNormalized.replace(/[:-]\s*$/u, '')}: ${currentNormalized}`,
+          `${current.text} | ${next.text}`,
+        ),
+      );
+      index += 1;
+      continue;
+    }
+
+    output.push(current);
+  }
+  return output;
 };
 
 const proposalField = (
@@ -211,6 +355,14 @@ const proposalField = (
   ...(sourceValue ? { sourceValue } : {}),
   ...(confidence !== undefined ? { confidence } : {}),
 });
+
+const lineSourceReferenceField = (line: SemanticLine) =>
+  proposalField(
+    'sourceReferences',
+    'مراجع أسطر المصدر',
+    'array',
+    line.sourceLineIndexes.map((lineIndex) => `page:${line.pageNumber}/line:${lineIndex + 1}`),
+  );
 
 const candidateKey = (type: string, page: number, identity: string) =>
   `${type.toLowerCase()}:${createHash('sha256')
@@ -360,6 +512,7 @@ const extractBeneficiaries = (line: SemanticLine, parentKey?: string) => {
       ...(gender === 'female'
         ? [proposalField('femaleCount', 'عدد الإناث', 'number', totalCount, rawCount, 0.96)]
         : []),
+      lineSourceReferenceField(line),
     ];
     proposals.push(
       makeCandidate({
@@ -369,7 +522,7 @@ const extractBeneficiaries = (line: SemanticLine, parentKey?: string) => {
         confidence: 0.95,
         page: line.pageNumber,
         section: line.section ?? 'الفئة المستهدفة',
-        evidence: line.text,
+        evidence: line.evidence,
         fields,
         parentKey,
         relationType: parentKey ? 'OBJECTIVE_BENEFICIARY' : undefined,
@@ -452,17 +605,36 @@ type TableRole =
 
 const tableRolePatterns: Array<[TableRole, RegExp]> = [
   ['code', /^(?:م|الرقم|الرمز|الكود)$/u],
-  ['objective', /(?:الهدف|الاهداف)/u],
-  ['initiative', /(?:النشاط|المبادرة|البرنامج|المشروع|خطة العمل|الاجراء التنفيذي)/u],
-  ['kpi', /(?:المؤشر|مؤشر الانجاز|معيار القياس)/u],
+  ['objective', /(?:الهدف الفرعي|الهدف التشغيلي|الاهداف الفرعية|الهدف|الاهداف)/u],
+  [
+    'initiative',
+    /(?:النشاط|المبادرة|البرنامج|المشروع|خطة العمل|الاجراء التنفيذي|العمل المطلوب|الوسيلة|البرامج والانشطة|الانشطة التنفيذية)/u,
+  ],
+  [
+    'kpi',
+    /(?:المؤشر|مؤشرات الانجاز|مؤشر الانجاز|مؤشرات قياس الاداء|معيار القياس|معيار النجاح)/u,
+  ],
   ['responsible', /(?:المسؤول|الجهة المسؤولة|الادارة المسؤولة|المنفذ|المشرف)/u],
   ['start', /(?:البداية|تاريخ البدء|من تاريخ)/u],
   ['end', /(?:النهاية|تاريخ الانتهاء|الى تاريخ)/u],
   ['target', /(?:المستهدف|خط الاساس|نسبة الانجاز)/u],
-  ['amount', /(?:المبلغ|التكلفة|الموازنة|الاجمالي)/u],
+  [
+    'amount',
+    /(?:المبلغ|التكلفة|الموازنة|الاجمالي|القيمة|الاعتماد|المبلغ التقديري|التكلفة التقديرية)/u,
+  ],
   ['beneficiary', /(?:الفئة المستهدفة|المستفيد|العدد)/u],
-  ['category', /(?:البند|الفئة|الوصف)/u],
+  [
+    'category',
+    /(?:البند|الفئة|الوصف|اوجه الصرف|مصروفات|بيان المصروف|نوع المصروف|الباب)/u,
+  ],
 ];
+
+export type SemanticCellReference = {
+  role: TableRole;
+  columnIndex: number;
+  rowIndex: number;
+  carriedFromRow?: number;
+};
 
 export type SemanticTableRow = {
   pageNumber: number;
@@ -470,6 +642,8 @@ export type SemanticTableRow = {
   rowIndex: number;
   values: Partial<Record<TableRole, string>>;
   cells: string[];
+  sourceCells: SemanticCellReference[];
+  evidence: string;
   confidence: number;
 };
 
@@ -484,52 +658,119 @@ export const mapSemanticTableRows = (tables: ExtractedTableData[]) => {
     let roles = new Map<number, TableRole>();
     for (
       let candidateHeaderRows = 1;
-      candidateHeaderRows <= Math.min(3, table.rows.length);
+      candidateHeaderRows <= Math.min(4, table.rows.length);
       candidateHeaderRows += 1
     ) {
       const candidateRoles = new Map<number, TableRole>();
-      for (let column = 0; column < columnCount; column += 1) {
-        const header = table.rows
+      const headers = Array.from({ length: columnCount }, (_, column) =>
+        table.rows
           .slice(0, candidateHeaderRows)
           .map((row) => row[column] ?? '')
           .filter(Boolean)
-          .join(' ');
+          .join(' '),
+      );
+      for (let column = 0; column < columnCount; column += 1) {
+        const header = headers[column] ?? '';
         const role = roleForHeader(header);
         if (role) candidateRoles.set(column, role);
+      }
+      const assignedRoles = new Set(candidateRoles.values());
+      for (let column = 0; column < columnCount; column += 1) {
+        if (candidateRoles.has(column)) continue;
+        for (const neighbour of [column + 1, column - 1]) {
+          if (neighbour < 0 || neighbour >= columnCount) continue;
+          const combinedHeaders = [
+            `${headers[column] ?? ''} ${headers[neighbour] ?? ''}`,
+            `${headers[neighbour] ?? ''} ${headers[column] ?? ''}`,
+          ];
+          const role = combinedHeaders.map(roleForHeader).find(Boolean);
+          if (!role || assignedRoles.has(role)) continue;
+          const populatedInColumn = table.rows
+            .slice(candidateHeaderRows)
+            .filter((row) => normalizeInstitutionalText(row[column] ?? '')).length;
+          const populatedInNeighbour = table.rows
+            .slice(candidateHeaderRows)
+            .filter((row) => normalizeInstitutionalText(row[neighbour] ?? '')).length;
+          const targetColumn =
+            populatedInNeighbour > populatedInColumn && !candidateRoles.has(neighbour)
+              ? neighbour
+              : column;
+          candidateRoles.set(targetColumn, role);
+          assignedRoles.add(role);
+          break;
+        }
       }
       if (candidateRoles.size > roles.size) {
         roles = candidateRoles;
         headerRowCount = candidateHeaderRows;
       }
-      if (roles.size >= 2) break;
     }
-    if (roles.size < 2) continue;
-    const carried = new Map<number, string>();
+    if (roles.size === 0) continue;
+    const carried = new Map<number, { value: string; rowIndex: number }>();
     table.rows.slice(headerRowCount).forEach((rawRow, relativeIndex) => {
       const values: Partial<Record<TableRole, string>> = {};
+      const sourceCells: SemanticCellReference[] = [];
+      const rowIndex = relativeIndex + headerRowCount;
       for (const [column, role] of roles) {
         let value = normalizeInstitutionalText(rawRow[column] ?? '');
+        let carriedFromRow: number | undefined;
         if (!value && ['objective', 'responsible', 'category'].includes(role)) {
-          value = carried.get(column) ?? '';
+          const previous = carried.get(column);
+          value = previous?.value ?? '';
+          carriedFromRow = previous?.rowIndex;
         }
         if (value) {
-          carried.set(column, value);
+          if (carriedFromRow === undefined) carried.set(column, { value, rowIndex });
           values[role] = value;
+          sourceCells.push({
+            role,
+            columnIndex: column,
+            rowIndex,
+            ...(carriedFromRow === undefined ? {} : { carriedFromRow }),
+          });
         }
       }
-      if (Object.values(values).filter(Boolean).length < 2) return;
+      const populatedValues = Object.values(values).filter(Boolean);
+      if (populatedValues.length === 0) return;
+      const referencedValues = sourceCells
+        .map((reference) => values[reference.role])
+        .filter((value): value is string => Boolean(value));
+      const evidence = [...new Set([...rawRow.filter(Boolean), ...referencedValues])].join(' | ');
       output.push({
         pageNumber: table.pageNumber,
         tableIndex: table.tableIndex,
-        rowIndex: relativeIndex + headerRowCount,
+        rowIndex,
         values,
         cells: rawRow,
-        confidence: Math.max(0.7, Math.min(0.96, table.confidence - (headerRowCount - 1) * 0.04)),
+        sourceCells,
+        evidence,
+        confidence: Math.max(
+          0.68,
+          Math.min(
+            0.96,
+            table.confidence -
+              (headerRowCount - 1) * 0.04 -
+              (populatedValues.length === 1 ? 0.08 : 0),
+          ),
+        ),
       });
     });
   }
   return output;
 };
+
+const tableSourceReferenceField = (row: SemanticTableRow) =>
+  proposalField(
+    'sourceReferences',
+    'مراجع خلايا المصدر',
+    'array',
+    row.sourceCells.map(
+      (cell) =>
+        `page:${row.pageNumber}/table:${row.tableIndex + 1}/row:${cell.rowIndex + 1}/cell:${
+          cell.columnIndex + 1
+        }${cell.carriedFromRow === undefined ? '' : `/merged-from-row:${cell.carriedFromRow + 1}`}`,
+    ),
+  );
 
 const fiscalYearFrom = (input: InstitutionalExtractionInput) => {
   const text = input.pages.map((page) => normalizeInstitutionalDigits(page.text)).join('\n');
@@ -547,8 +788,12 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
       /^(?:الهدف\s+(?:الفرعي|التشغيلي)\s*(?<ordinal>الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|\d+)|الهدف\s*(?:رقم)?\s*(?<number>\d+)|الهدف\s+التشغيلي)\s*[:-]?\s*(?<title>.+)$/u.exec(
         line.normalized,
       ) ??
+      /^(?<title>.+?)\s+(?:الهدف\s+(?:الفرعي|التشغيلي)\s*(?<ordinal>الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|\d+)|الهدف\s*(?:رقم)?\s*(?<number>\d+))$/u.exec(
+        line.normalized,
+      ) ??
       (line.section === 'الأهداف الفرعية'
-        ? /^(?<number>\d+)\s*[.)-]\s*(?<title>.+)$/u.exec(line.normalized)
+        ? (/^(?<number>\d+)\s*[.)-]\s*(?<title>.+)$/u.exec(line.normalized) ??
+          /^(?<title>.+?)\s*[.)-]\s*(?<number>\d+)$/u.exec(line.normalized))
         : null);
     const objectiveTitle = objectiveMatch?.groups?.title?.trim();
     if (objectiveMatch && objectiveTitle && meaningfulTitle(objectiveTitle)) {
@@ -561,7 +806,7 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
           : []),
         proposalField('title', 'عنوان الهدف', 'string', objectiveTitle, objectiveTitle, 0.96),
         proposalField('description', 'الوصف', 'string', objectiveTitle, objectiveTitle, 0.9),
-        proposalField('objectiveLevel', 'مستوى الهدف', 'string', 'OPERATIONAL', line.text, 0.96),
+        proposalField('objectiveLevel', 'مستوى الهدف', 'string', 'OPERATIONAL', line.evidence, 0.96),
         ...(sequence !== null
           ? [
               proposalField(
@@ -574,6 +819,7 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
               ),
             ]
           : []),
+        lineSourceReferenceField(line),
       ];
       const objective = makeCandidate({
         proposalType: 'STRATEGIC_OBJECTIVE',
@@ -583,7 +829,7 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
         confidence: sequence !== null ? 0.94 : 0.86,
         page: line.pageNumber,
         section: line.section ?? 'الأهداف الفرعية',
-        evidence: line.text,
+        evidence: line.evidence,
         fields,
       });
       proposals.push(objective);
@@ -595,6 +841,9 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
     const parent = findNearest(objectives, line.position);
     const kpiMatch =
       /^(?:(?:المؤشر|مؤشر الانجاز|مؤشر الاداء|معيار القياس)\s*[:-]\s*)(?<title>.+)$/u.exec(
+        line.normalized,
+      ) ??
+      /^(?<title>.+?)\s+(?:المؤشر|مؤشر الانجاز|مؤشر الاداء|معيار القياس)$/u.exec(
         line.normalized,
       ) ??
       (line.section === 'مؤشرات الإنجاز'
@@ -610,11 +859,12 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
         proposalField('title', 'عنوان المؤشر', 'string', kpiTitle, kpiTitle, 0.95),
         proposalField('description', 'الوصف', 'string', kpiTitle, kpiTitle, 0.9),
         ...(kpiTitle.includes('%') || /نسبة/u.test(kpiTitle)
-          ? [proposalField('unit', 'الوحدة', 'string', '%', line.text, 0.86)]
+          ? [proposalField('unit', 'الوحدة', 'string', '%', line.evidence, 0.86)]
           : []),
         ...(target !== null
           ? [proposalField('target', 'المستهدف', 'number', target, targetMatch?.[1], 0.93)]
           : []),
+        lineSourceReferenceField(line),
       ];
       const kpi = makeCandidate({
         proposalType: 'KPI',
@@ -624,7 +874,7 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
         confidence: parent ? 0.92 : 0.82,
         page: line.pageNumber,
         section: line.section ?? 'مؤشرات الإنجاز',
-        evidence: line.text,
+        evidence: line.evidence,
         fields,
         parentKey: parent?.candidateKey,
         relationType: parent ? 'OBJECTIVE_KPI' : undefined,
@@ -637,6 +887,9 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
     const initiativeMatch =
       /^(?:المبادرة|المشروع|البرنامج|النشاط|خطة العمل|الاجراء التنفيذي)\s*[:-]\s*(?<title>.+)$/u.exec(
         line.normalized,
+      ) ??
+      /^(?<title>.+?)\s+(?:المبادرة|المشروع|البرنامج|النشاط|خطة العمل|الاجراء التنفيذي)$/u.exec(
+        line.normalized,
       );
     const initiativeTitle = initiativeMatch?.groups?.title?.trim();
     if (initiativeTitle && meaningfulTitle(initiativeTitle)) {
@@ -648,7 +901,7 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
         confidence: parent ? 0.91 : 0.82,
         page: line.pageNumber,
         section: line.section ?? 'خطة العمل',
-        evidence: line.text,
+        evidence: line.evidence,
         fields: [
           proposalField(
             'name',
@@ -659,6 +912,7 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
             0.96,
           ),
           proposalField('description', 'الوصف', 'string', initiativeTitle, initiativeTitle, 0.9),
+          lineSourceReferenceField(line),
         ],
         parentKey: parent?.candidateKey,
         relationType: parent ? 'OBJECTIVE_INITIATIVE' : undefined,
@@ -695,9 +949,10 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
             confidence: knownDepartments.includes(department) ? 0.94 : 0.76,
             page: line.pageNumber,
             section: line.section ?? 'المسؤول عن التنفيذ',
-            evidence: line.text,
+            evidence: line.evidence,
             fields: [
               proposalField('department', 'الإدارة المسؤولة', 'string', department, responsible),
+              lineSourceReferenceField(line),
             ],
           }),
         );
@@ -732,7 +987,7 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
           confidence: date.calendarType === 'GREGORIAN' ? 0.95 : 0.84,
           page: line.pageNumber,
           section: line.section ?? label,
-          evidence: line.text,
+          evidence: line.evidence,
           fields: [
             proposalField('label', 'نوع التاريخ', 'string', label, label),
             proposalField(
@@ -756,6 +1011,7 @@ const buildLineCandidates = (input: InstitutionalExtractionInput, lines: Semanti
               date.normalizedValue,
               date.originalText,
             ),
+            lineSourceReferenceField(line),
           ],
           parentKey: target?.candidateKey,
           relationType: target ? 'ENTITY_DATE' : undefined,
@@ -774,7 +1030,7 @@ const buildTableCandidates = (
   const objectives = [...existingObjectives];
   for (const row of rows) {
     const position = row.pageNumber * 10_000 + row.rowIndex;
-    const evidence = row.cells.join(' | ');
+    const evidence = row.evidence;
     let objective = row.values.objective
       ? objectives.find(
           (entry) => matchText(entry.candidate.title) === matchText(row.values.objective ?? ''),
@@ -821,6 +1077,7 @@ const buildTableCandidates = (
             : []),
           proposalField('tableIndex', 'رقم الجدول', 'number', row.tableIndex + 1),
           proposalField('tableRow', 'صف الجدول', 'number', row.rowIndex + 1),
+          tableSourceReferenceField(row),
         ],
       });
       proposals.push(objective);
@@ -890,6 +1147,7 @@ const buildTableCandidates = (
           ...commonFields,
           proposalField('tableIndex', 'رقم الجدول', 'number', row.tableIndex + 1),
           proposalField('tableRow', 'صف الجدول', 'number', row.rowIndex + 1),
+          tableSourceReferenceField(row),
         ],
         parentKey: objective?.candidateKey,
         relationType: objective ? 'OBJECTIVE_KPI' : undefined,
@@ -924,6 +1182,7 @@ const buildTableCandidates = (
           ...commonFields,
           proposalField('tableIndex', 'رقم الجدول', 'number', row.tableIndex + 1),
           proposalField('tableRow', 'صف الجدول', 'number', row.rowIndex + 1),
+          tableSourceReferenceField(row),
         ],
         parentKey: objective?.candidateKey,
         relationType: objective ? 'OBJECTIVE_INITIATIVE' : undefined,
@@ -945,13 +1204,22 @@ const buildTableCandidates = (
     if (row.values.beneficiary) {
       const line: SemanticLine = {
         text: row.values.beneficiary,
+        evidence: row.evidence,
         normalized: matchText(row.values.beneficiary),
         pageNumber: row.pageNumber,
         lineIndex: row.rowIndex,
         position,
         section: 'الفئة المستهدفة',
+        sourceLineIndexes: [],
       };
-      proposals.push(...extractBeneficiaries(line, objective?.candidateKey));
+      const beneficiaryProposals = extractBeneficiaries(line, objective?.candidateKey);
+      beneficiaryProposals.forEach((proposal) => {
+        proposal.fields = proposal.fields.filter((field) => field.key !== 'sourceReferences');
+        const sourceReference = tableSourceReferenceField(row);
+        proposal.proposedData.sourceReferences = sourceReference.value;
+        proposal.fields.push(sourceReference);
+      });
+      proposals.push(...beneficiaryProposals);
     }
   }
   return { proposals, objectives };
@@ -965,8 +1233,10 @@ const buildBudgetCandidates = (
   const proposals: ExtractionProposalCandidate[] = [];
   const fiscalYear = fiscalYearFrom(input);
   const totalCandidates: ExtractionProposalCandidate[] = [];
-  const totalPattern =
+  const labelBeforeTotalPattern =
     /(?:اجمالي\s+(?:الموازنة|الميزانية|التكلفة)|الموازنة المقترحة|الاجمالي)\s*[:-]?\s*(?<amount>[0-9٠-٩۰-۹٬,.]+)\s*(?<currency>ريال|ر\.?\s*س|SAR)?/giu;
+  const valueBeforeTotalPattern =
+    /(?<amount>[0-9٠-٩۰-۹٬,.]+)\s*(?<currency>ريال|ر\.?\s*س|SAR)?\s*[-:]?\s*(?:اجمالي\s+(?:الموازنة|الميزانية|التكلفة)|الموازنة المقترحة|الاجمالي)/giu;
   for (const line of lines) {
     if (
       !line.section?.includes('الموازنة') &&
@@ -974,7 +1244,11 @@ const buildBudgetCandidates = (
     ) {
       continue;
     }
-    for (const match of line.normalized.matchAll(totalPattern)) {
+    const totalMatches = [
+      ...line.normalized.matchAll(labelBeforeTotalPattern),
+      ...line.normalized.matchAll(valueBeforeTotalPattern),
+    ];
+    for (const match of totalMatches) {
       const rawAmount = match.groups?.amount;
       const amount = rawAmount ? parseSemanticNumber(rawAmount) : null;
       if (amount === null) continue;
@@ -987,7 +1261,7 @@ const buildBudgetCandidates = (
         confidence: currency ? 0.97 : 0.88,
         page: line.pageNumber,
         section: line.section ?? 'الموازنة',
-        evidence: line.text,
+        evidence: line.evidence,
         fields: [
           ...(fiscalYear
             ? [
@@ -1005,6 +1279,7 @@ const buildBudgetCandidates = (
           ...(currency
             ? [proposalField('currency', 'العملة', 'string', currency, match.groups?.currency)]
             : []),
+          lineSourceReferenceField(line),
         ],
         key: candidateKey('budget', line.pageNumber, `${fiscalYear ?? ''}|${amount}`),
       });
@@ -1029,7 +1304,7 @@ const buildBudgetCandidates = (
           confidence: row.confidence,
           page: row.pageNumber,
           section: 'الموازنة',
-          evidence: row.cells.join(' | '),
+          evidence: row.evidence,
           fields: [
             ...(fiscalYear
               ? [
@@ -1044,7 +1319,8 @@ const buildBudgetCandidates = (
               : []),
             proposalField('title', 'عنوان الموازنة', 'string', 'إجمالي الموازنة', category),
             proposalField('totalPlanned', 'إجمالي الموازنة', 'currency', amount, rawAmount),
-            proposalField('currency', 'العملة', 'string', 'SAR', row.cells.join(' | ')),
+            proposalField('currency', 'العملة', 'string', 'SAR', row.evidence),
+            tableSourceReferenceField(row),
           ],
         });
         proposals.push(budget);
@@ -1061,7 +1337,7 @@ const buildBudgetCandidates = (
         confidence: row.confidence,
         page: row.pageNumber,
         section: 'بنود الموازنة',
-        evidence: row.cells.join(' | '),
+        evidence: row.evidence,
         fields: [
           proposalField('category', 'بند الموازنة', 'string', category, category),
           ...(row.values.initiative && row.values.initiative !== category
@@ -1089,6 +1365,7 @@ const buildBudgetCandidates = (
             : []),
           proposalField('tableIndex', 'رقم الجدول', 'number', row.tableIndex + 1),
           proposalField('tableRow', 'صف الجدول', 'number', row.rowIndex + 1),
+          tableSourceReferenceField(row),
         ],
       }),
     );
@@ -1166,7 +1443,7 @@ export const applyProposalQualityGates = (proposals: ExtractionProposalCandidate
 
 export const extractOperationalSemanticProposals = (input: InstitutionalExtractionInput) => {
   const sections = detectInstitutionalSections(input.pages, input.tables);
-  const lines = semanticLines(input, sections);
+  const lines = assembleLogicalLines(semanticLines(input, sections));
   const lineCandidates = buildLineCandidates(input, lines);
   const semanticRows = mapSemanticTableRows(input.tables);
   const tableCandidates = buildTableCandidates(semanticRows, lineCandidates.objectives);

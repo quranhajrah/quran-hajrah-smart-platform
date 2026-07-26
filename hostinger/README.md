@@ -65,6 +65,8 @@ Migration `20260724_enterprise_24_document_intelligence` is additive. The existi
 
 Enterprise 24.1 adds the additive migration `20260726_enterprise_24_1_semantic_extraction`. It preserves existing jobs and proposals, adds raw normalized-text separation, operational objective level, and proposal relationships. The same `postbuild:production` lifecycle applies it; Hostinger must continue to use `apps/api/dist/server.js`.
 
+Enterprise 24.2 adds no migration and changes no Hostinger setting. Deploy with the existing build lifecycle and keep `apps/api/dist/server.js` as the entry file. After deployment, reanalyze the production operational plan and complete the live checklist in `docs/enterprise-24-2-semantic-assembly.md`.
+
 The seed adds seven analysis permissions, safe role defaults, deterministic rule identifiers, and the bounded default analysis configuration. It never seeds extracted values.
 
 After deployment, use an authorized account to open a non-sensitive supported document, start analysis explicitly, inspect pages/tables/proposals, approve one evidence-backed proposal, run conflict preview, and confirm import. Open the imported Enterprise 23 record and verify “عرض المصدر”. An image-only PDF must report `OCR_REQUIRED`.

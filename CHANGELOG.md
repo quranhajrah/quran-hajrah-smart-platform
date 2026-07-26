@@ -4,6 +4,17 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ## Unreleased
 
+## [24.2.0] - 2026-07-26
+
+### Enterprise 24.2 Production-Structure Semantic Assembly
+
+- Added an evidence-preserving in-memory logical record assembler for multiline labels/values, RTL value-label order, and split beneficiary text.
+- Expanded deterministic production table aliases, split-header reconstruction, direction-independent column mapping, and merged objective/category carry-forward.
+- Added evidence-backed extraction for operational objectives, KPIs, supported initiatives, split beneficiary groups, budget totals in either order, and budget lines.
+- Preserved page, line, table, row, cell, and merged-cell references inside existing proposal data without a schema migration.
+- Cleared stale analysis errors after successful review-center loads and restricted failure details to `FAILED` and `OCR_REQUIRED`.
+- Added a sanitized three-page/one-table regression fixture that contains no confidential association prose and verifies the production acceptance structure.
+
 ## [24.1.0] - 2026-07-26
 
 ### Enterprise 24.1 Institutional Semantic Extraction Upgrade

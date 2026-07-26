@@ -2,7 +2,7 @@
 
 Production TypeScript monorepo for the Quran Hajrah Smart Platform. It includes secure identity/RBAC, the Institutional Knowledge Center, the Executive Intelligence Platform, and the Institutional Document Intelligence Engine.
 
-Current release: `24.1.0` — Enterprise 24.1 Institutional Semantic Extraction Upgrade.
+Current release: `24.2.0` — Enterprise 24.2 Production-Structure Semantic Assembly.
 
 ## Structure
 
@@ -122,7 +122,7 @@ The command is intentionally not scheduled by the application. Configure a Hosti
 
 ## Institutional Document Intelligence
 
-Enterprise 24.1 converts supported institutional documents into related, reviewable proposals:
+Enterprise 24.2 converts supported institutional documents into related, reviewable proposals:
 
 ```text
 document → explicit analysis → pages/tables → deterministic proposals
@@ -132,11 +132,11 @@ document → explicit analysis → pages/tables → deterministic proposals
 
 Supported extraction is limited to PDFs with embedded text, DOCX, and TXT. Image-only PDFs are marked `OCR_REQUIRED`; this release does not call OCR, generative AI, embedding, or paid external services. No proposal is imported without an authorized human approval and import confirmation.
 
-The deterministic semantic mapper reconstructs safely recognized RTL visual-order lines, detects institutional sections, maps table headers to row fields, separates beneficiary groups and operational objectives, links objectives to KPIs and initiatives, and links budgets to their lines. Raw page text remains stored separately from normalized text. Values without evidence remain missing, and low-confidence useful items are marked for review.
+The deterministic semantic mapper reconstructs safely recognized RTL visual-order lines, assembles adjacent labels and values, merges split table headers, maps direction-independent columns, carries explicitly merged table values, separates beneficiary groups and operational objectives, links objectives to KPIs and initiatives, and links budgets to their lines. Raw page text remains stored separately from normalized text. Values without evidence remain missing, and low-confidence useful items are marked for review.
 
 The admin analysis center is `/document-analysis`. The API is under `/api/document-analysis`, with explicit analysis start at `POST /api/documents/:id/analyze`. Analysis is never triggered automatically during upload.
 
-The base migration is `20260724_enterprise_24_document_intelligence`; Enterprise 24.1 adds the non-destructive migration `20260726_enterprise_24_1_semantic_extraction`. The production seed adds analysis permissions, safe role defaults, versioned deterministic rule identifiers, and processing limits without seeding document-derived values. Scheduler-ready analysis alerts can be generated with:
+The base migration is `20260724_enterprise_24_document_intelligence`; Enterprise 24.1 adds the non-destructive migration `20260726_enterprise_24_1_semantic_extraction`. Enterprise 24.2 requires no schema migration. The production seed adds analysis permissions, safe role defaults, versioned deterministic rule identifiers, and processing limits without seeding document-derived values. Scheduler-ready analysis alerts can be generated with:
 
 ```bash
 npm run document-analysis:alerts
@@ -149,7 +149,8 @@ npm run document-analysis:alerts
 - [Enterprise 23 usage guide](docs/enterprise-23-executive-intelligence.md)
 - [Enterprise 24 analysis guide](docs/enterprise-24-document-intelligence.md)
 - [Enterprise 24.1 semantic extraction guide](docs/enterprise-24-1-semantic-extraction.md)
-- [Enterprise 24.1 validation report](docs/phase-24-1-semantic-extraction-validation-report.md)
+- [Enterprise 24.2 semantic assembly guide](docs/enterprise-24-2-semantic-assembly.md)
+- [Enterprise 24.2 validation report](docs/phase-24-2-validation-report.md)
 - [Review and import guide](docs/enterprise-24-review-and-import.md)
 - [Extraction methodology](docs/extraction-methodology.md)
 - [Source traceability](docs/source-traceability.md)

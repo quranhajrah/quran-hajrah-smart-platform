@@ -18,6 +18,8 @@ The review center groups proposals into Arabic institutional groups: beneficiari
 
 Confidence is a rule signal, not proof. The reviewer must compare the proposal to the source.
 
+Enterprise 24.2 table proposals also carry machine-readable page/table/row/cell references. When a value came from a merged cell, the reference identifies the originating row. A successful review-center refresh clears any prior request error; failure diagnostics are shown only for `FAILED` and `OCR_REQUIRED` jobs.
+
 ## Decisions
 
 - **Approve**: accept unchanged evidence-backed fields.

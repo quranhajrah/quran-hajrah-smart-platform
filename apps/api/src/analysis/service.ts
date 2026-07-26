@@ -527,6 +527,7 @@ export class DocumentAnalysisService {
         status: 'PROCESSING',
         startedAt: new Date(),
         failureReason: null,
+        providerMetadata: null,
       });
       reportStage('configuration', 'completed');
 

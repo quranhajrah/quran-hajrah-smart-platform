@@ -26,9 +26,11 @@ Mammoth reads text and semantic table markup. Before decompression, the ZIP cent
 
 TXT is decoded as UTF-8 after file-size and basic binary-content checks. It yields one logical page.
 
-## Rules
+## Logical assembly and rules
 
-Versioned rules first detect document sections, then map explicit Arabic headings and table headers to objectives, KPIs, initiatives, milestones, responsible departments, beneficiaries, dates, budget totals/lines, risks/treatments, governance scores, financial values, policy obligations, and reporting periods. Adjacent line fields and same-row table fields are attached to their entity. Specialized extractors limit applicable proposal types by document type.
+Enterprise 24.2 first assembles an in-memory logical view. It joins recognized multiline labels and values, supports value-before-label RTL order, combines split beneficiary counts/groups, merges split table headers, maps physical columns independently of direction, and carries explicitly merged objective/category cells. Raw page text and stored table cells remain unchanged.
+
+Versioned rules then detect document sections and map explicit Arabic headings and table headers to objectives, KPIs, initiatives, milestones, responsible departments, beneficiaries, dates, budget totals/lines, risks/treatments, governance scores, financial values, policy obligations, and reporting periods. Adjacent line fields and same-row table fields are attached to their entity. Specialized extractors limit applicable proposal types by document type.
 
 A rule result includes proposal type, structured fields, page, section/table, evidence, confidence, extraction method, and rule identifier. Configuration can disable a document type or rule and can raise the confidence threshold.
 
@@ -36,4 +38,4 @@ Quality gates require a source page, bounded evidence, meaningful semantic conte
 
 ## OCR and future providers
 
-When embedded text is below the configured minimum, the job becomes `OCR_REQUIRED`. Enterprise 24.1 does not perform OCR. Its “semantic” mapping is deterministic local rule processing—not semantic AI. LLM structured extraction, embeddings, and reranking remain interfaces only and make no network call.
+When embedded text is below the configured minimum, the job becomes `OCR_REQUIRED`. Enterprise 24.2 does not perform OCR. Its “semantic” mapping is deterministic local rule processing—not semantic AI. LLM structured extraction, embeddings, and reranking remain interfaces only and make no network call.

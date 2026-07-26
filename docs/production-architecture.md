@@ -108,4 +108,6 @@ Future OCR, LLM, embedding, reranking, and provider-driven semantic extractors a
 
 Enterprise 24.1 adds only a deterministic semantic mapping layer inside the same API process. It retains raw extracted page text, stores a separate normalized RTL reconstruction, detects institutional sections and table roles, and persists proposal relationships. This is not semantic AI: it makes no network call and never delays `listen()`. The Hostinger entry remains `apps/api/dist/server.js`.
 
+Enterprise 24.2 adds an in-memory logical record assembler before those rules. It joins recognized adjacent labels/values and maps split or RTL-reversed table headers while retaining source page/line/table/row/cell references. It adds no schema, migration, service, environment variable, or startup dependency.
+
 `npm run document-analysis:alerts` is the scheduler-ready command for failed analysis, overdue review, approved-but-not-imported proposals, and unresolved conflicts. It is not scheduled inside the API process.

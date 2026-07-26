@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalysisProposal } from './api';
-import { buildExtractionSummary, groupAnalysisProposals } from './document-analysis-view';
+import {
+  buildExtractionSummary,
+  groupAnalysisProposals,
+  shouldShowAnalysisFailure,
+} from './document-analysis-view';
 
 const proposal = (
   proposalType: string,
@@ -58,5 +62,12 @@ describe('document analysis review presentation', () => {
       budgetLines: 1,
       budgetTotal: 530000,
     });
+  });
+
+  it('shows failure details only for failed or OCR-required jobs', () => {
+    expect(shouldShowAnalysisFailure('FAILED')).toBe(true);
+    expect(shouldShowAnalysisFailure('OCR_REQUIRED')).toBe(true);
+    expect(shouldShowAnalysisFailure('PROPOSALS_READY')).toBe(false);
+    expect(shouldShowAnalysisFailure('IMPORTED')).toBe(false);
   });
 });

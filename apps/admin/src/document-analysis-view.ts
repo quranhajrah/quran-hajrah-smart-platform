@@ -1,5 +1,8 @@
 import type { AnalysisProposal } from './api';
 
+export const shouldShowAnalysisFailure = (status: string) =>
+  status === 'FAILED' || status === 'OCR_REQUIRED';
+
 const groupOrder = [
   'الفئات المستهدفة',
   'الأهداف التشغيلية',

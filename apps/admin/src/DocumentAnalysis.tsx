@@ -11,7 +11,11 @@ import {
   type PageResult,
 } from './api';
 import { useAuth } from './auth';
-import { buildExtractionSummary, groupAnalysisProposals } from './document-analysis-view';
+import {
+  buildExtractionSummary,
+  groupAnalysisProposals,
+  shouldShowAnalysisFailure,
+} from './document-analysis-view';
 
 const statusLabels: Record<string, string> = {
   QUEUED: 'في قائمة الانتظار',
@@ -276,6 +280,7 @@ export function DocumentAnalysisReview() {
     setSelected((current) =>
       current ? (nextProposals.items.find((item) => item.id === current.id) ?? null) : null,
     );
+    setError('');
   }, [can, decisionFilter, id, minimumConfidence, pageFilter, typeFilter]);
 
   useEffect(() => {
@@ -476,8 +481,10 @@ export function DocumentAnalysisReview() {
           )}
         </div>
       </div>
-      {job.failureReason && <StatusMessage error>{job.failureReason}</StatusMessage>}
-      {job.providerMetadata?.failure && (
+      {shouldShowAnalysisFailure(job.status) && job.failureReason && (
+        <StatusMessage error>{job.failureReason}</StatusMessage>
+      )}
+      {shouldShowAnalysisFailure(job.status) && job.providerMetadata?.failure && (
         <div className="status-message analysis-failure-details" role="status">
           <strong>مرحلة الفشل: {job.providerMetadata.failure.stageLabel ?? 'غير محددة'}</strong>
           <span>
