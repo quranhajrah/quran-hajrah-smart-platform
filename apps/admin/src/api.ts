@@ -169,6 +169,18 @@ export type AnalysisProposal = {
     sourceValue?: string;
     confidence?: number;
   }>;
+  relations?: Array<{
+    id: string;
+    relationType: string;
+    confidence: number;
+    direction: 'parent' | 'child';
+    proposal: {
+      id: string;
+      proposalType: string;
+      title: string;
+      decision: string;
+    };
+  }>;
 };
 export type AnalysisConflict = {
   proposalId: string;

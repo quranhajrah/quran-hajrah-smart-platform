@@ -1317,6 +1317,24 @@ td small {
   max-height: 850px;
   overflow: auto;
 }
+.proposal-group {
+  display: grid;
+  gap: 0.55rem;
+}
+.proposal-group h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: #eef5f1;
+  color: #245b48;
+  font-size: 0.95rem;
+}
+.proposal-group h3 small {
+  color: #6a8077;
+}
 .proposal-card {
   display: grid;
   grid-template-columns: auto 1fr;

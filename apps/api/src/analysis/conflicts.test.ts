@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { conflictForProposal } from './prisma-store.js';
+import { conflictForProposal, hydrateRelationData } from './prisma-store.js';
 
 const completeObjective = {
   id: 'proposal-1',
@@ -62,5 +62,34 @@ describe('document-analysis conflict detection', () => {
     expect(result.allowedActions).toEqual(['skip']);
     expect(result.reason).toContain('code');
     expect(result.reason).toContain('startDate');
+  });
+
+  it('resolves proposal relationships to imported parent records', async () => {
+    const client = {
+      sourceEvidenceReference: { findFirst: async () => null },
+    };
+    const data = await hydrateRelationData(
+      client as never,
+      {
+        id: 'kpi-proposal',
+        proposedData: { code: 'KPI-1', title: 'نسبة الإنجاز' },
+        editedData: null,
+        childRelations: [
+          {
+            relationType: 'OBJECTIVE_KPI',
+            parentProposalId: 'objective-proposal',
+            parentProposal: {
+              id: 'objective-proposal',
+              decision: 'APPROVED',
+              importTargetType: 'STRATEGIC_OBJECTIVE',
+            },
+          },
+        ],
+      } as never,
+      new Map([['objective-proposal', 'objective-record']]),
+      false,
+    );
+
+    expect(data.objectiveId).toBe('objective-record');
   });
 });

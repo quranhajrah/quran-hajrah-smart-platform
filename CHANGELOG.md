@@ -4,6 +4,17 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ## Unreleased
 
+## [24.1.0] - 2026-07-26
+
+### Enterprise 24.1 Institutional Semantic Extraction Upgrade
+
+- Reconstructed embedded Arabic PDF text from split glyphs and reversed visual word order while retaining raw text separately from normalized text.
+- Added deterministic section detection, beneficiary grouping, operational-objective, KPI, initiative, responsibility, date, budget-total, budget-line, and table-row semantic mapping.
+- Added evidence-backed proposal quality gates that reject headings, numeric-only titles, duplicate normalized titles, orphaned relations, and unsupported values.
+- Added persistent proposal relationships and relation-aware transactional import into Enterprise 23 without automatic beneficiary measurement imports.
+- Upgraded the Arabic review center with institutional grouping, extraction summaries, relationship visibility, explicit import targets, and low-confidence counts.
+- Added an additive migration, production operational-plan fixture, RTL reconstruction, semantic mapping, relation, import, UI, security, and migration tests.
+
 ### Fixed
 
 - Moved the production document-storage fallback out of replaceable deployment directories into the application user's persistent home, rejected relative production roots, and added cross-release upload/retrieve/analyze/delete coverage.

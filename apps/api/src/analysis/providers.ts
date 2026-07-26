@@ -25,6 +25,10 @@ const institutionalArabicMarkers = [
   'الإجمالي',
 ];
 const reverseCharacters = (value: string) => [...value].reverse().join('');
+const reverseWords = (value: string) => value.trim().split(/\s+/).reverse().join(' ');
+const arabicCharacterPattern = /[\u0600-\u06ff]/u;
+const splitArabicGlyphsPattern =
+  /(?<![\p{L}\p{N}])(?:[\u0600-\u06ff][ \t]){2,}[\u0600-\u06ff](?![\p{L}\p{N}])/gu;
 
 export const repairVisualArabicOrder = (input: string) => {
   const normalMarkers = institutionalArabicMarkers.filter((marker) =>
@@ -33,24 +37,72 @@ export const repairVisualArabicOrder = (input: string) => {
   const reversedMarkers = institutionalArabicMarkers.filter((marker) =>
     input.includes(reverseCharacters(marker)),
   ).length;
-  if (reversedMarkers <= normalMarkers || reversedMarkers < 2) return input;
+  if (reversedMarkers === 0 || reversedMarkers <= normalMarkers) return input;
   return input
     .replace(/[\u0600-\u06ff]+/g, reverseCharacters)
     .replace(/(^|\s):([\u0600-\u06ff]+)/gm, '$1$2:');
 };
 
-export const normalizeInstitutionalText = (input: string) =>
-  repairVisualArabicOrder(
+const reversedHeadingCandidates = new Set([
+  'الخطة التشغيلية والموازنة',
+  'الهدف التشغيلي',
+  'الهدف الفرعي',
+  'المؤشر',
+  'مؤشر الإنجاز',
+  'المسؤول عن التنفيذ',
+  'المبادرة',
+  'المشروع',
+  'البرنامج',
+  'النشاط',
+  'تاريخ البدء',
+  'تاريخ الانتهاء',
+  'الفئة المستهدفة',
+  'إجمالي الموازنة',
+  'الموازنة المقترحة',
+]);
+
+export const repairReversedInstitutionalLine = (input: string) => {
+  const segments = input.split(':').map((segment) => segment.trim());
+  if (segments.length > 1) {
+    const reconstructed = [...segments].reverse().map(reverseWords);
+    if (
+      [...reversedHeadingCandidates].some(
+        (heading) => reconstructed[0] === heading || reconstructed[0]?.startsWith(`${heading} `),
+      )
+    ) {
+      return reconstructed.join(': ');
+    }
+  }
+  const reversed = reverseWords(input);
+  return [...reversedHeadingCandidates].some(
+    (heading) => reversed === heading || reversed.startsWith(`${heading} `),
+  )
+    ? reversed
+    : input;
+};
+
+export const normalizeInstitutionalText = (input: string) => {
+  const normalized = repairVisualArabicOrder(
     input
       .normalize('NFC')
+      .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
       .replaceAll('\u00a0', ' ')
       .replace(/\r\n?/g, '\n')
       .split('\n')
-      .map((line) => line.replace(/[ \t\f\v]+/g, ' ').trim())
+      .map((line) =>
+        line
+          .replace(splitArabicGlyphsPattern, (glyphs) => glyphs.replace(/\s+/g, ''))
+          .replace(/[ \t\f\v]+/g, ' ')
+          .replace(/\s+([،؛:])/g, '$1')
+          .replace(/([،؛])(?=\S)/g, '$1 ')
+          .trim(),
+      )
       .join('\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim(),
   );
+  return normalized.split('\n').map(repairReversedInstitutionalLine).join('\n');
+};
 
 const ensureLimits = (input: DocumentExtractionInput) => {
   if (input.data.byteLength === 0) {
@@ -97,7 +149,7 @@ export const validateOfficeArchive = (data: Buffer, compressedLimit: number) => 
   }
 };
 
-const groupPositionedRows = (items: PositionedTextItem[]) => {
+export const groupPositionedRows = (items: PositionedTextItem[]) => {
   const rows: PositionedTextItem[][] = [];
   for (const item of [...items].sort((left, right) => right.y - left.y || left.x - right.x)) {
     const row = rows.find(
@@ -108,6 +160,33 @@ const groupPositionedRows = (items: PositionedTextItem[]) => {
   }
   return rows.map((row) => row.sort((left, right) => left.x - right.x));
 };
+
+const isSingleArabicGlyph = (value: string) =>
+  [...value.trim()].length === 1 && arabicCharacterPattern.test(value);
+
+const positionedRowText = (row: PositionedTextItem[]) => {
+  const arabicCharacters = row.reduce(
+    (total, item) =>
+      total + [...item.text].filter((character) => arabicCharacterPattern.test(character)).length,
+    0,
+  );
+  const visibleCharacters = row.reduce(
+    (total, item) => total + item.text.replace(/\s/g, '').length,
+    0,
+  );
+  const rtl = visibleCharacters > 0 && arabicCharacters / visibleCharacters >= 0.35;
+  const ordered = [...row].sort((left, right) => (rtl ? right.x - left.x : left.x - right.x));
+  return ordered.reduce((output, item, index) => {
+    const text = item.text.trim();
+    if (!text) return output;
+    const previous = ordered[index - 1];
+    const joinGlyph = previous && isSingleArabicGlyph(previous.text) && isSingleArabicGlyph(text);
+    return `${output}${output && !joinGlyph ? ' ' : ''}${text}`;
+  }, '');
+};
+
+export const reconstructPositionedPageText = (items: PositionedTextItem[]) =>
+  normalizeInstitutionalText(groupPositionedRows(items).map(positionedRowText).join('\n'));
 
 const columnsAreConsistent = (first: PositionedTextItem[], second: PositionedTextItem[]) => {
   if (first.length !== second.length || first.length < 2) return false;
@@ -208,14 +287,13 @@ export class PdfTextExtractionProvider implements DocumentTextExtractionProvider
             ];
           })
           .filter((item) => item.text.trim().length > 0);
-        const rows = groupPositionedRows(positionedItems);
-        const text = normalizeInstitutionalText(
-          rows.map((row) => row.map((item) => item.text).join(' ')).join('\n'),
-        );
+        const rawText = positionedItems.map((item) => item.text).join(' ');
+        const text = reconstructPositionedPageText(positionedItems);
         const tables = detectPositionedTables(pageNumber, positionedItems, remainingTables);
         remainingTables -= tables.length;
         pages.push({
           pageNumber,
+          rawText,
           text,
           hasEmbeddedText: text.length > 0,
           width: viewport.width,
@@ -335,6 +413,7 @@ export class DocxTextExtractionProvider implements DocumentTextExtractionProvide
       return [
         {
           pageNumber: 1,
+          rawText: textResult.value,
           text,
           hasEmbeddedText: text.length > 0,
           quality: text.length === 0 ? 0 : Math.min(1, text.length / 500),
@@ -384,6 +463,7 @@ export class TxtTextExtractionProvider implements DocumentTextExtractionProvider
     return [
       {
         pageNumber: 1,
+        rawText: input.data.toString('utf8'),
         text,
         hasEmbeddedText: text.length > 0,
         quality: text.length === 0 ? 0 : 1,

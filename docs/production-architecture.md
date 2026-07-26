@@ -104,6 +104,8 @@ The current providers are PDF.js for embedded PDF text, Mammoth for DOCX, and UT
 
 Deterministic Arabic rules create evidence-backed proposals. Approval and import are separate permissions. One Prisma transaction covers each import batch, and every imported target receives a `SourceEvidenceReference` with document, version, proposal, page, section, evidence, method, actor, and timestamp. Budget imports use isolated `BudgetRecord` and `BudgetLine` tables and are summarized on the executive dashboard.
 
-Future OCR, semantic, LLM, embedding, and reranking providers are interfaces only. Enterprise 24 makes no external AI or OCR calls and does not claim semantic extraction.
+Future OCR, LLM, embedding, reranking, and provider-driven semantic extractors are interfaces only. Enterprise 24 makes no external AI or OCR calls.
+
+Enterprise 24.1 adds only a deterministic semantic mapping layer inside the same API process. It retains raw extracted page text, stores a separate normalized RTL reconstruction, detects institutional sections and table roles, and persists proposal relationships. This is not semantic AI: it makes no network call and never delays `listen()`. The Hostinger entry remains `apps/api/dist/server.js`.
 
 `npm run document-analysis:alerts` is the scheduler-ready command for failed analysis, overdue review, approved-but-not-imported proposals, and unresolved conflicts. It is not scheduled inside the API process.

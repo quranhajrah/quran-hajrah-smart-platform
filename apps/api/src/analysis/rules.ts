@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { DocumentType } from '../documents/types.js';
 import { normalizeInstitutionalText } from './providers.js';
+import { extractOperationalSemanticProposals } from './semantic.js';
 import type {
   ExtractedPageData,
   ExtractedTableData,
@@ -29,6 +30,15 @@ export const institutionalRuleIds = [
   'amount.financial.v1',
   'section.policy_requirement.v1',
   'period.reporting.v1',
+  'semantic.operational_objective.v2',
+  'semantic.kpi.v2',
+  'semantic.initiative.v2',
+  'semantic.responsibility.v2',
+  'semantic.date.v2',
+  'semantic.beneficiary.v2',
+  'semantic.table_row.v2',
+  'semantic.budget_total.v2',
+  'semantic.budget_line.v2',
 ] as const;
 
 const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
@@ -616,6 +626,9 @@ export class OperationalPlanExtractor extends RuleBasedExtractor {
     'RISK',
   ]);
   protected includeBudgetTables = true;
+  extract(input: InstitutionalExtractionInput) {
+    return extractOperationalSemanticProposals(input);
+  }
   supports(documentType: DocumentType) {
     return documentType === 'OPERATIONAL_PLAN' || documentType === 'PROGRAM';
   }

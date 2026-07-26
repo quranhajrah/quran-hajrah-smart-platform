@@ -33,9 +33,10 @@ The configured defaults limit files to 25 MiB, 500 PDF pages, 300 tables, 5,000 
 ## Data model
 
 - `DocumentAnalysisJob`: immutable document-version request, fingerprint, status, provider metadata, counts, and timing.
-- `DocumentPage`, `DocumentExtractedText`: page boundary and normalized text.
+- `DocumentPage`, `DocumentExtractedText`: page boundary, raw text, and normalized text.
 - `DocumentExtractedTable`, `DocumentTableCell`: ordered table structure.
 - `ExtractionProposal`, `ExtractionProposalField`: proposed target and individual reviewable fields.
+- `ExtractionProposalRelation`: evidence-backed parent/child relationships between proposed entities.
 - `ExtractionReview`: append-only review decisions and before/after data.
 - `ExtractionImportBatch`, `ExtractionImportItem`: idempotent transactional import result.
 - `SourceEvidenceReference`: document, version, proposal, page, section, evidence, method, target, actor, and time.
@@ -43,7 +44,7 @@ The configured defaults limit files to 25 MiB, 500 PDF pages, 300 tables, 5,000 
 - `DocumentAnalysisAuditLog`: analysis, review, approval, import, configuration, and failure events.
 - `BudgetRecord`, `BudgetLine`: isolated production budget target exposed in executive summaries.
 
-Migration: `20260724_enterprise_24_document_intelligence`.
+Migrations: `20260724_enterprise_24_document_intelligence` and the additive Enterprise 24.1 migration `20260726_enterprise_24_1_semantic_extraction`.
 
 ## Providers and deterministic extractors
 
@@ -112,12 +113,12 @@ The analysis pipeline emits structured stage events for configuration, file retr
 
 Failed jobs return an Arabic stage-specific message and a diagnostic identifier. Authorized audit viewers can correlate that identifier with the sanitized exception, error code, and pipeline stage. Prisma result persistence uses an explicit bounded 15-second acquisition window and 120-second transaction window so multi-page plans can remain atomic over a remote PostgreSQL connection without relying on Prisma's short interactive-transaction default.
 
-Some Arabic PDFs expose text in visual word order. The PDF provider repairs that order only when at least two known institutional headings are detected in reversed form and reversed headings outnumber logical headings. Numeric values are not reversed or rewritten.
+Some Arabic PDFs expose text in visual word order. The PDF provider repairs a line only when reversing its colon-delimited segments or words produces a recognized institutional heading. It also joins split Arabic glyphs without collapsing real multi-space word boundaries. Numeric values are preserved, and the unmodified raw text remains stored beside the normalized copy.
 
 ## Known limitations
 
 - No OCR for image-only PDF.
-- No semantic or generative extraction.
+- No semantic AI or generative extraction; Enterprise 24.1 provides deterministic institutional semantic mapping only.
 - PDF tables are inferred from positioned embedded text; merged cells and complex reading order can require manual correction.
 - DOCX has no reliable page boundary, so its extracted source page is page 1.
 - Analysis currently runs in the existing Node.js process after the request is accepted. A Hostinger restart can interrupt an in-flight job; an operator must cancel and retry that job. A durable external worker is a future scaling option, not part of this release.

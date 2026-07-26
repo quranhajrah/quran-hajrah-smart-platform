@@ -258,6 +258,15 @@ const documentAnalysisRuleIds = [
   'amount.financial.v1',
   'section.policy_requirement.v1',
   'period.reporting.v1',
+  'semantic.operational_objective.v2',
+  'semantic.kpi.v2',
+  'semantic.initiative.v2',
+  'semantic.responsibility.v2',
+  'semantic.date.v2',
+  'semantic.beneficiary.v2',
+  'semantic.table_row.v2',
+  'semantic.budget_total.v2',
+  'semantic.budget_line.v2',
 ];
 
 const metricDefinitions = [
@@ -415,7 +424,7 @@ async function main() {
     where: { key: 'institutional-default' },
     update: {
       isActive: true,
-      providerVersion: 'enterprise-24-rules-v1',
+        providerVersion: 'enterprise-24.1-semantic-v2',
       maxFileSizeBytes: 26_214_400,
       maxPages: 500,
       maxTables: 300,
@@ -445,7 +454,7 @@ async function main() {
     create: {
       key: 'institutional-default',
       isActive: true,
-      providerVersion: 'enterprise-24-rules-v1',
+        providerVersion: 'enterprise-24.1-semantic-v2',
       maxFileSizeBytes: 26_214_400,
       maxPages: 500,
       maxTables: 300,

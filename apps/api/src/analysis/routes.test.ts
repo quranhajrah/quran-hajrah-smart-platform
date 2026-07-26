@@ -467,6 +467,14 @@ describe('document analysis API security and workflow', () => {
     expect(analysisStore.audits.map((item) => item.action)).toContain('PROPOSAL_REJECTED');
   });
 
+  it('rejects unsafe edited proposal object keys', async () => {
+    await request(app)
+      .patch(`/api/document-analysis/proposals/${analysisStore.proposal.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ editedData: { constructor: { prototype: { polluted: true } } } })
+      .expect(400);
+  });
+
   it('previews conflicts and keeps import idempotent with source traceability', async () => {
     analysisStore.proposal.decision = 'APPROVED';
     analysisStore.job.status = 'APPROVED';

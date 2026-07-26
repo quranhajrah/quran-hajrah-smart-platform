@@ -80,6 +80,7 @@ export type ExtractedTableData = {
 
 export type ExtractedPageData = {
   pageNumber: number;
+  rawText?: string;
   text: string;
   hasEmbeddedText: boolean;
   width?: number;
@@ -153,6 +154,9 @@ export type ProposalFieldCandidate = {
 };
 
 export type ExtractionProposalCandidate = {
+  candidateKey?: string;
+  parentCandidateKey?: string;
+  relationType?: string;
   proposalType: ExtractionProposalType;
   title: string;
   proposedData: Record<string, unknown>;
@@ -234,7 +238,21 @@ export type AnalysisPageRecord = {
   extractionQuality?: number | null;
   width?: number | null;
   height?: number | null;
+  rawText?: string;
   text?: string;
+};
+
+export type ProposalRelationRecord = {
+  id: string;
+  relationType: string;
+  confidence: number;
+  direction: 'parent' | 'child';
+  proposal: {
+    id: string;
+    proposalType: ExtractionProposalType;
+    title: string;
+    decision: ProposalDecision;
+  };
 };
 
 export type AnalysisTableRecord = {
@@ -274,6 +292,7 @@ export type ProposalRecord = {
   createdAt: Date;
   updatedAt: Date;
   fields?: ProposalFieldCandidate[];
+  relations?: ProposalRelationRecord[];
 };
 
 export type AnalysisListQuery = {

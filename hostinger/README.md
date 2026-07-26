@@ -63,6 +63,8 @@ The PostgreSQL backup and file-storage backup form one recovery unit. Back up bo
 
 Migration `20260724_enterprise_24_document_intelligence` is additive. The existing `postbuild:production` lifecycle applies it through `DIRECT_URL` before seed and before Hostinger launches `apps/api/dist/server.js`. Analysis never delays `listen()`, and no entry-file or Hostinger Start Command change is required.
 
+Enterprise 24.1 adds the additive migration `20260726_enterprise_24_1_semantic_extraction`. It preserves existing jobs and proposals, adds raw normalized-text separation, operational objective level, and proposal relationships. The same `postbuild:production` lifecycle applies it; Hostinger must continue to use `apps/api/dist/server.js`.
+
 The seed adds seven analysis permissions, safe role defaults, deterministic rule identifiers, and the bounded default analysis configuration. It never seeds extracted values.
 
 After deployment, use an authorized account to open a non-sensitive supported document, start analysis explicitly, inspect pages/tables/proposals, approve one evidence-backed proposal, run conflict preview, and confirm import. Open the imported Enterprise 23 record and verify “عرض المصدر”. An image-only PDF must report `OCR_REQUIRED`.

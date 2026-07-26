@@ -541,6 +541,7 @@ model StrategicObjective {
   title         String
   description   String?
   strategicAxis String
+  objectiveLevel String                 @default("STRATEGIC")
   baseline      Decimal?                @db.Decimal(18, 4)
   target        Decimal?                @db.Decimal(18, 4)
   startDate     DateTime                @db.Date
@@ -1072,6 +1073,7 @@ model DocumentPage {
 model DocumentExtractedText {
   id                String       @id @default(uuid()) @db.Uuid
   pageId            String       @unique @db.Uuid
+  rawText           String?      @db.Text
   normalizedText    String       @db.Text
   characterCount    Int
   languageHint      String?
@@ -1145,6 +1147,8 @@ model ExtractionProposal {
   documentVersion   DocumentVersion            @relation(fields: [documentVersionId], references: [id], onDelete: Restrict)
   reviewedBy        User?                      @relation("ExtractionProposalReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   fields            ExtractionProposalField[]
+  parentRelations   ExtractionProposalRelation[] @relation("ExtractionProposalParent")
+  childRelations    ExtractionProposalRelation[] @relation("ExtractionProposalChild")
   reviews           ExtractionReview[]
   importItems       ExtractionImportItem[]
   sourceReferences  SourceEvidenceReference[]
@@ -1156,6 +1160,21 @@ model ExtractionProposal {
   @@index([reviewedById, reviewedAt])
   @@index([importTargetType, decision])
   @@index([deletedAt])
+}
+
+model ExtractionProposalRelation {
+  id               String             @id @default(uuid()) @db.Uuid
+  parentProposalId String             @db.Uuid
+  childProposalId  String             @db.Uuid
+  relationType     String
+  confidence       Decimal            @default(1) @db.Decimal(5, 4)
+  createdAt        DateTime           @default(now())
+  parentProposal   ExtractionProposal @relation("ExtractionProposalParent", fields: [parentProposalId], references: [id], onDelete: Cascade)
+  childProposal    ExtractionProposal @relation("ExtractionProposalChild", fields: [childProposalId], references: [id], onDelete: Cascade)
+
+  @@unique([parentProposalId, childProposalId, relationType])
+  @@index([parentProposalId, relationType])
+  @@index([childProposalId, relationType])
 }
 
 model ExtractionProposalField {

@@ -9,6 +9,7 @@ Every imported record is linked through `SourceEvidenceReference` to:
 - source page and section;
 - bounded source evidence;
 - extraction method;
+- proposal parent/child relationship where applicable;
 - import timestamp and importing user.
 
 The source proposal retains its rule identifier, confidence, original structured proposal, human-edited data, reviews, and import items. This creates an auditable chain from a current Enterprise 23 record back to the immutable Knowledge Center version.

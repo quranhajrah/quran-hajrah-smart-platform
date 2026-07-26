@@ -5,6 +5,7 @@ import {
   extractTablesFromMammothHtml,
   normalizeInstitutionalText,
   PdfTextExtractionProvider,
+  reconstructPositionedPageText,
   repairVisualArabicOrder,
   validateOfficeArchive,
 } from './providers.js';
@@ -127,6 +128,18 @@ describe('document text extraction providers', () => {
     );
   });
 
+  it('joins split Arabic glyphs and reconstructs RTL positioned words', () => {
+    expect(normalizeInstitutionalText('ا ل ه د ف   ا ل ع ا م')).toBe('الهدف العام');
+    expect(
+      reconstructPositionedPageText([
+        { text: 'البرامج', x: 20, y: 100, width: 45, height: 10 },
+        { text: 'جودة', x: 90, y: 100, width: 30, height: 10 },
+        { text: 'رفع', x: 140, y: 100, width: 20, height: 10 },
+        { text: 'الهدف:', x: 180, y: 100, width: 40, height: 10 },
+      ]),
+    ).toBe('الهدف: رفع جودة البرامج');
+  });
+
   it('detects image-only content as OCR-required input', () => {
     expect(hasSufficientEmbeddedText([{ text: '' }, { text: '  ' }], 80)).toBe(false);
     expect(hasSufficientEmbeddedText([{ text: 'نص مؤسسي كافٍ' }], 5)).toBe(true);
@@ -180,7 +193,13 @@ describe('deterministic institutional rules', () => {
     expect(proposals.some((item) => item.proposalType === 'STRATEGIC_OBJECTIVE')).toBe(true);
     expect(proposals.some((item) => item.proposalType === 'KPI')).toBe(true);
     expect(proposals.some((item) => item.proposalType === 'INITIATIVE')).toBe(true);
-    expect(proposals.some((item) => item.proposalType === 'RESPONSIBLE_DEPARTMENT')).toBe(true);
+    expect(
+      proposals.some(
+        (item) =>
+          item.proposalType === 'RESPONSIBLE_DEPARTMENT' ||
+          item.proposedData.responsibleDepartment === 'الشؤون التعليمية',
+      ),
+    ).toBe(true);
     expect(proposals.some((item) => item.proposalType === 'DOCUMENT_DATE')).toBe(true);
     expect(proposals.some((item) => item.proposalType === 'BENEFICIARY_GROUP')).toBe(true);
     expect(proposals.every((item) => item.evidenceSnippet && item.sourcePage === 1)).toBe(true);

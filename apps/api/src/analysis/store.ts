@@ -24,6 +24,7 @@ export type SaveExtractionInput = {
   metadata: Record<string, unknown>;
   pages: Array<{
     pageNumber: number;
+    rawText?: string;
     text: string;
     hasEmbeddedText: boolean;
     quality: number;

@@ -11,6 +11,7 @@ import {
   type PageResult,
 } from './api';
 import { useAuth } from './auth';
+import { buildExtractionSummary, groupAnalysisProposals } from './document-analysis-view';
 
 const statusLabels: Record<string, string> = {
   QUEUED: 'في قائمة الانتظار',
@@ -53,6 +54,22 @@ const decisionLabels: Record<string, string> = {
   APPROVED: 'معتمد',
   REJECTED: 'مرفوض',
   EDITED: 'معدّل ومعتمد',
+};
+
+const importTargetLabels: Record<string, string> = {
+  NONE: 'بدون استيراد',
+  STRATEGIC_OBJECTIVE: 'هدف تشغيلي',
+  KPI: 'مؤشر أداء',
+  METRIC: 'تعريف مؤشر مؤسسي',
+  METRIC_VALUE: 'قياس مؤشر مؤسسي',
+  INITIATIVE: 'مبادرة تشغيلية',
+  MILESTONE: 'مرحلة رئيسية',
+  RISK: 'خطر مؤسسي',
+  RISK_TREATMENT: 'معالجة خطر',
+  EXECUTIVE_ALERT: 'تنبيه تنفيذي',
+  EXECUTIVE_REPORT_SECTION: 'قسم تقرير تنفيذي',
+  BUDGET_RECORD: 'موازنة',
+  BUDGET_LINE: 'بند موازنة',
 };
 
 function StatusMessage({ children, error = false }: { children: string; error?: boolean }) {
@@ -226,6 +243,7 @@ export function DocumentAnalysisReview() {
   const [minimumConfidence, setMinimumConfidence] = useState('0');
   const [pageFilter, setPageFilter] = useState('');
   const [editJson, setEditJson] = useState('');
+  const [importTargetType, setImportTargetType] = useState('NONE');
   const [conflicts, setConflicts] = useState<AnalysisConflict[]>([]);
   const [conflictActions, setConflictActions] = useState<Record<string, string>>({});
   const [mergeFields, setMergeFields] = useState<Record<string, string>>({});
@@ -276,10 +294,21 @@ export function DocumentAnalysisReview() {
     () => new Map(pages.map((page) => [page.pageNumber, page])),
     [pages],
   );
+  const groupedProposals = useMemo(() => groupAnalysisProposals(proposals), [proposals]);
+  const extractionSummary = useMemo(
+    () =>
+      buildExtractionSummary(
+        proposals,
+        job?.pageCount ?? pages.length,
+        job?.tableCount ?? tables.length,
+      ),
+    [job?.pageCount, job?.tableCount, pages.length, proposals, tables.length],
+  );
 
   function choose(proposal: AnalysisProposal) {
     setSelected(proposal);
     setEditJson(asEditableJson(proposal));
+    setImportTargetType(proposal.importTargetType);
   }
 
   async function review(
@@ -307,6 +336,12 @@ export function DocumentAnalysisReview() {
     if (!selected) return;
     try {
       const value = JSON.parse(editJson) as Record<string, unknown>;
+      if (importTargetType !== selected.importTargetType) {
+        await api(`/document-analysis/proposals/${selected.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ importTargetType }),
+        });
+      }
       await review(selected.id, 'approve', value);
     } catch (cause) {
       if (cause instanceof SyntaxError) setError('صيغة البيانات المعدلة غير صحيحة.');
@@ -454,6 +489,40 @@ export function DocumentAnalysisReview() {
       {error && <StatusMessage error>{error}</StatusMessage>}
 
       <section className="document-panel">
+        <div className="section-heading">
+          <div>
+            <h2>ملخص الاستخراج الدلالي</h2>
+            <p>يعرض ما اكتُشف من المستند فقط، دون افتراض قيم غير موجودة في المصدر.</p>
+          </div>
+        </div>
+        <div className="metrics-grid analysis-metrics">
+          {[
+            ['عدد الصفحات', extractionSummary.pageCount],
+            ['عدد الجداول', extractionSummary.tableCount],
+            ['عدد الأهداف', extractionSummary.objectives],
+            ['عدد المؤشرات', extractionSummary.kpis],
+            ['عدد المبادرات', extractionSummary.initiatives],
+            ['عدد الفئات المستهدفة', extractionSummary.beneficiaries],
+            ['عدد بنود الموازنة', extractionSummary.budgetLines],
+            ['عناصر تحتاج مراجعة', extractionSummary.lowConfidence],
+          ].map(([label, value]) => (
+            <article className="metric-card metric-muted" key={label}>
+              <span>{label}</span>
+              <strong>{Number(value).toLocaleString('ar-SA')}</strong>
+            </article>
+          ))}
+          <article className="metric-card metric-success">
+            <span>إجمالي الموازنة المستخرج</span>
+            <strong>
+              {extractionSummary.budgetTotal === null
+                ? 'غير متاح'
+                : `${extractionSummary.budgetTotal.toLocaleString('ar-SA')} ر.س`}
+            </strong>
+          </article>
+        </div>
+      </section>
+
+      <section className="document-panel">
         <div className="analysis-filter-grid">
           <label>
             نوع المقترح
@@ -536,38 +605,50 @@ export function DocumentAnalysisReview() {
         )}
         <div className="analysis-review-layout">
           <div className="proposal-list">
-            {proposals.map((proposal) => (
-              <article
-                className={
-                  selected?.id === proposal.id ? 'proposal-card selected' : 'proposal-card'
-                }
-                key={proposal.id}
-              >
-                <label className="proposal-check">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(proposal.id)}
-                    onChange={(event) =>
-                      setSelectedIds((current) =>
-                        event.target.checked
-                          ? [...current, proposal.id]
-                          : current.filter((item) => item !== proposal.id),
-                      )
+            {groupedProposals.map((group) => (
+              <section className="proposal-group" key={group.label}>
+                <h3>
+                  {group.label} <small>({group.items.length.toLocaleString('ar-SA')})</small>
+                </h3>
+                {group.items.map((proposal) => (
+                  <article
+                    className={
+                      selected?.id === proposal.id ? 'proposal-card selected' : 'proposal-card'
                     }
-                  />
-                  <span className={`decision decision-${proposal.decision.toLowerCase()}`}>
-                    {decisionLabels[proposal.decision]}
-                  </span>
-                </label>
-                <button className="proposal-open" onClick={() => choose(proposal)}>
-                  <small>{proposalLabels[proposal.proposalType] ?? proposal.proposalType}</small>
-                  <strong>{proposal.title}</strong>
-                  <span>
-                    الصفحة {proposal.sourcePage ?? '—'} · ثقة{' '}
-                    {Math.round(proposal.confidence * 100)}%
-                  </span>
-                </button>
-              </article>
+                    key={proposal.id}
+                  >
+                    <label className="proposal-check">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(proposal.id)}
+                        onChange={(event) =>
+                          setSelectedIds((current) =>
+                            event.target.checked
+                              ? [...current, proposal.id]
+                              : current.filter((item) => item !== proposal.id),
+                          )
+                        }
+                      />
+                      <span className={`decision decision-${proposal.decision.toLowerCase()}`}>
+                        {decisionLabels[proposal.decision]}
+                      </span>
+                    </label>
+                    <button className="proposal-open" onClick={() => choose(proposal)}>
+                      <small>
+                        {proposal.proposalType === 'STRATEGIC_OBJECTIVE' &&
+                        proposal.proposedData.objectiveLevel === 'OPERATIONAL'
+                          ? 'هدف تشغيلي'
+                          : (proposalLabels[proposal.proposalType] ?? proposal.proposalType)}
+                      </small>
+                      <strong>{proposal.title}</strong>
+                      <span>
+                        الصفحة {proposal.sourcePage ?? '—'} · ثقة{' '}
+                        {Math.round(proposal.confidence * 100)}%
+                      </span>
+                    </button>
+                  </article>
+                ))}
+              </section>
             ))}
             {proposals.length === 0 && <StatusMessage>لا توجد مقترحات مطابقة.</StatusMessage>}
           </div>
@@ -610,8 +691,41 @@ export function DocumentAnalysisReview() {
                     ))}
                   </dl>
                 </div>
+                {selected.relations && selected.relations.length > 0 && (
+                  <div className="proposal-data">
+                    <strong>العناصر المرتبطة</strong>
+                    <ul>
+                      {selected.relations.map((relation) => (
+                        <li key={relation.id}>
+                          {relation.direction === 'parent' ? 'يتبع' : 'يتضمن'}:{' '}
+                          {relation.proposal.title}
+                          <small> · {Math.round(relation.confidence * 100)}%</small>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {can('document_analysis.review') && selected.decision === 'PENDING' && (
                   <form className="proposal-edit-form" onSubmit={saveAndApprove}>
+                    <label>
+                      وجهة الاستيراد
+                      <select
+                        value={importTargetType}
+                        onChange={(event) => setImportTargetType(event.target.value)}
+                      >
+                        {Object.entries(importTargetLabels).map(([value, label]) => (
+                          <option value={value} key={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      {selected.proposalType === 'BENEFICIARY_GROUP' && (
+                        <small>
+                          لا تُحوّل أعداد المستفيدين إلى قياس حي إلا بعد اختيار «قياس مؤشر مؤسسي»
+                          وتحديد المؤشر وتاريخ القياس صراحة.
+                        </small>
+                      )}
+                    </label>
                     <label>
                       تعديل البيانات قبل الاعتماد
                       <textarea

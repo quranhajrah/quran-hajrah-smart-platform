@@ -49,6 +49,7 @@
 - [ ] Verify report generation and approval require distinct permissions and all six acceptance actions appear in the audit log.
 - [ ] If scheduling alerts, run `npm run executive:alerts` once, confirm idempotency, and only then configure the approved Hostinger schedule.
 - [ ] Confirm migration `20260724_enterprise_24_document_intelligence` and the Enterprise 24 seed complete before `server.js` starts.
+- [ ] Confirm migration `20260726_enterprise_24_1_semantic_extraction` and the Enterprise 24.1 semantic-rule seed complete before reanalysis.
 - [ ] Start analysis explicitly for an approved text-based PDF and confirm the review center shows page, evidence, fields, confidence, and import destination.
 - [ ] Verify an image-only PDF becomes `OCR_REQUIRED` and is not reported as successfully extracted.
 - [ ] Approve and import one evidence-backed proposal, then verify “عرض المصدر” on the imported record.

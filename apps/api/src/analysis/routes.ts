@@ -58,7 +58,40 @@ const auditSchema = z
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
   })
   .strict();
-const editedData = z.record(z.string(), z.unknown());
+const forbiddenProposalKeys = new Set(['__proto__', 'prototype', 'constructor']);
+const safeProposalValue = (value: unknown, depth = 0): boolean => {
+  if (depth > 5) return false;
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return true;
+  if (Array.isArray(value)) {
+    return value.length <= 100 && value.every((item) => safeProposalValue(item, depth + 1));
+  }
+  if (typeof value !== 'object') return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  return (
+    entries.length <= 100 &&
+    entries.every(
+      ([key, item]) =>
+        !forbiddenProposalKeys.has(key) && key.length <= 100 && safeProposalValue(item, depth + 1),
+    )
+  );
+};
+const editedData = z
+  .record(z.string().min(1).max(100), z.unknown())
+  .superRefine((value, context) => {
+    if (!safeProposalValue(value)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'تحتوي بيانات المقترح على بنية غير مسموح بها.',
+      });
+      return;
+    }
+    if (JSON.stringify(value).length > 20_000) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'تتجاوز بيانات المقترح الحد المسموح.',
+      });
+    }
+  });
 const updateProposalSchema = z
   .object({
     title: z.string().trim().min(2).max(300).optional(),

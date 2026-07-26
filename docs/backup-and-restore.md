@@ -4,6 +4,8 @@
 
 Treat PostgreSQL and immutable document-version storage as one recovery unit. Enterprise 24 adds jobs, pages, extracted text/tables/cells, proposals, review decisions, import batches/items, source evidence, analysis configuration/audit, and budget records. A database snapshot without its matching document binaries cannot reproduce or display the evidence.
 
+Enterprise 24.1 also stores raw page text separately from normalized text and adds proposal relationships. Include `DocumentExtractedText` and `ExtractionProposalRelation` in consistency checks after restore; do not regenerate normalized text or relations silently from a different rule version.
+
 After a restore, run `npm run db:status`, verify `/ready`, open a previously imported record, and confirm its “عرض المصدر” action reaches the matching document and page reference. Never use `prisma migrate reset`, `migrate dev`, or `db push` against production.
 
 ## Recovery set

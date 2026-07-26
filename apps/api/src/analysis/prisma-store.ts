@@ -34,6 +34,20 @@ const jobInclude = {
 
 const proposalInclude = {
   fields: { orderBy: { sortOrder: 'asc' as const } },
+  parentRelations: {
+    include: {
+      childProposal: {
+        select: { id: true, proposalType: true, title: true, decision: true },
+      },
+    },
+  },
+  childRelations: {
+    include: {
+      parentProposal: {
+        select: { id: true, proposalType: true, title: true, decision: true },
+      },
+    },
+  },
 } satisfies Prisma.ExtractionProposalInclude;
 
 const numeric = (value: unknown) => (value === null || value === undefined ? null : Number(value));
@@ -93,6 +107,22 @@ const mapProposal = (
     ...(proposalField.sourceValue ? { sourceValue: proposalField.sourceValue } : {}),
     ...(proposalField.confidence !== null ? { confidence: Number(proposalField.confidence) } : {}),
   })),
+  relations: [
+    ...record.parentRelations.map((relation) => ({
+      id: relation.id,
+      relationType: relation.relationType,
+      confidence: Number(relation.confidence),
+      direction: 'child' as const,
+      proposal: relation.childProposal,
+    })),
+    ...record.childRelations.map((relation) => ({
+      id: relation.id,
+      relationType: relation.relationType,
+      confidence: Number(relation.confidence),
+      direction: 'parent' as const,
+      proposal: relation.parentProposal,
+    })),
+  ],
 });
 
 const effectiveData = (proposal: { proposedData: unknown; editedData: unknown }) => ({
@@ -101,6 +131,75 @@ const effectiveData = (proposal: { proposedData: unknown; editedData: unknown })
 });
 
 type DbClient = Prisma.TransactionClient | typeof database;
+
+const importRelationInclude = {
+  childRelations: {
+    include: {
+      parentProposal: {
+        select: {
+          id: true,
+          decision: true,
+          importTargetType: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.ExtractionProposalInclude;
+
+type ProposalWithImportRelations = Prisma.ExtractionProposalGetPayload<{
+  include: typeof importRelationInclude;
+}>;
+
+const relationImportField: Record<string, string | undefined> = {
+  OBJECTIVE_KPI: 'objectiveId',
+  OBJECTIVE_INITIATIVE: 'objectiveId',
+  INITIATIVE_MILESTONE: 'initiativeId',
+  RISK_TREATMENT: 'riskId',
+  BUDGET_LINE_ITEM: 'budgetRecordId',
+};
+
+const importPriority: Partial<Record<ImportTargetType, number>> = {
+  STRATEGIC_OBJECTIVE: 10,
+  BUDGET_RECORD: 10,
+  METRIC: 10,
+  RISK: 10,
+  KPI: 20,
+  INITIATIVE: 20,
+  METRIC_VALUE: 20,
+  BUDGET_LINE: 20,
+  RISK_TREATMENT: 20,
+  MILESTONE: 30,
+};
+
+export const hydrateRelationData = async (
+  client: DbClient,
+  proposal: ProposalWithImportRelations,
+  importedTargets: Map<string, string>,
+  allowApprovedParentPlaceholder: boolean,
+) => {
+  const data = effectiveData(proposal);
+  for (const relation of proposal.childRelations) {
+    const targetField = relationImportField[relation.relationType];
+    if (!targetField || nonEmpty(data[targetField])) continue;
+    let targetId = importedTargets.get(relation.parentProposalId);
+    if (!targetId) {
+      const importedParent = await client.sourceEvidenceReference.findFirst({
+        where: { sourceProposalId: relation.parentProposalId },
+        select: { targetRecordId: true },
+      });
+      targetId = importedParent?.targetRecordId;
+    }
+    if (
+      !targetId &&
+      allowApprovedParentPlaceholder &&
+      ['APPROVED', 'EDITED'].includes(relation.parentProposal.decision)
+    ) {
+      targetId = relation.parentProposalId;
+    }
+    if (targetId) data[targetField] = targetId;
+  }
+  return data;
+};
 
 const nonEmpty = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
 const finite = (value: unknown) => value !== '' && Number.isFinite(Number(value));
@@ -380,6 +479,9 @@ const applyImport = async (
         ...(nonEmpty(values.title) ? { title: String(values.title) } : {}),
         ...(nonEmpty(values.description) ? { description: String(values.description) } : {}),
         ...(nonEmpty(values.strategicAxis) ? { strategicAxis: String(values.strategicAxis) } : {}),
+        ...(nonEmpty(values.objectiveLevel)
+          ? { objectiveLevel: String(values.objectiveLevel) }
+          : {}),
         ...(finite(values.baseline) ? { baseline: Number(values.baseline) } : {}),
         ...(finite(values.target) ? { target: Number(values.target) } : {}),
         ...(nonEmpty(values.startDate) ? { startDate: asDate(values.startDate) } : {}),
@@ -857,6 +959,7 @@ export class PrismaAnalysisStore implements AnalysisStore {
               height: page.height,
               extractedText: {
                 create: {
+                  rawText: page.rawText,
                   normalizedText: page.text,
                   characterCount: page.text.length,
                   extractionMethod: input.extractionMethod,
@@ -889,8 +992,9 @@ export class PrismaAnalysisStore implements AnalysisStore {
         }
 
         reportStage('proposal_persistence');
+        const proposalIds = new Map<string, string>();
         for (const proposal of input.proposals) {
-          await transaction.extractionProposal.create({
+          const created = await transaction.extractionProposal.create({
             data: {
               jobId,
               documentId: job.documentId,
@@ -916,6 +1020,26 @@ export class PrismaAnalysisStore implements AnalysisStore {
                   sortOrder,
                 })),
               },
+            },
+            select: { id: true },
+          });
+          if (proposal.candidateKey) proposalIds.set(proposal.candidateKey, created.id);
+        }
+        for (const proposal of input.proposals) {
+          if (!proposal.candidateKey || !proposal.parentCandidateKey || !proposal.relationType) {
+            continue;
+          }
+          const parentProposalId = proposalIds.get(proposal.parentCandidateKey);
+          const childProposalId = proposalIds.get(proposal.candidateKey);
+          if (!parentProposalId || !childProposalId || parentProposalId === childProposalId) {
+            continue;
+          }
+          await transaction.extractionProposalRelation.create({
+            data: {
+              parentProposalId,
+              childProposalId,
+              relationType: proposal.relationType,
+              confidence: proposal.confidence,
             },
           });
         }
@@ -985,6 +1109,7 @@ export class PrismaAnalysisStore implements AnalysisStore {
       extractionQuality: numeric(page.extractionQuality),
       width: numeric(page.width),
       height: numeric(page.height),
+      rawText: page.extractedText?.rawText ?? undefined,
       text: page.extractedText?.normalizedText ?? '',
     }));
   }
@@ -1165,8 +1290,18 @@ export class PrismaAnalysisStore implements AnalysisStore {
   async detectConflicts(jobId: string) {
     const proposals = await database.extractionProposal.findMany({
       where: { jobId, decision: { in: ['APPROVED', 'EDITED'] }, deletedAt: null },
+      include: importRelationInclude,
     });
-    return Promise.all(proposals.map((proposal) => conflictForProposal(database, proposal)));
+    return Promise.all(
+      proposals.map(async (proposal) => {
+        const data = await hydrateRelationData(database, proposal, new Map(), true);
+        return conflictForProposal(database, {
+          ...proposal,
+          proposedData: data,
+          editedData: null,
+        });
+      }),
+    );
   }
 
   async importApproved(
@@ -1200,20 +1335,35 @@ export class PrismaAnalysisStore implements AnalysisStore {
         });
         const proposals = await transaction.extractionProposal.findMany({
           where: { jobId, decision: { in: ['APPROVED', 'EDITED'] }, deletedAt: null },
+          include: importRelationInclude,
         });
+        proposals.sort(
+          (left, right) =>
+            (importPriority[left.importTargetType] ?? 100) -
+            (importPriority[right.importTargetType] ?? 100),
+        );
         const requested = new Map(decisions.map((decision) => [decision.proposalId, decision]));
+        const importedByProposal = new Map<string, string>();
         let imported = 0;
         let skipped = 0;
         const importedTargets: Array<{ proposalId: string; targetType: string; targetId: string }> =
           [];
         for (const proposal of proposals) {
-          const conflict = await conflictForProposal(transaction, proposal);
+          const data = await hydrateRelationData(transaction, proposal, importedByProposal, false);
+          const conflict = await conflictForProposal(transaction, {
+            ...proposal,
+            proposedData: data,
+            editedData: null,
+          });
           const choice = requested.get(proposal.id);
           const action =
             choice && conflict.allowedActions.includes(choice.action)
               ? choice.action
               : conflict.defaultAction;
           if (action === 'skip') {
+            if (conflict.existingRecordId) {
+              importedByProposal.set(proposal.id, conflict.existingRecordId);
+            }
             await transaction.extractionImportItem.create({
               data: {
                 batchId: batch.id,
@@ -1228,7 +1378,6 @@ export class PrismaAnalysisStore implements AnalysisStore {
             skipped += 1;
             continue;
           }
-          const data = effectiveData(proposal);
           const target = await applyImport(
             transaction,
             proposal.importTargetType,
@@ -1270,6 +1419,7 @@ export class PrismaAnalysisStore implements AnalysisStore {
             targetType: proposal.importTargetType,
             targetId: target.id,
           });
+          importedByProposal.set(proposal.id, target.id);
           imported += 1;
         }
         const summary = { total: proposals.length, imported, skipped, importedTargets };

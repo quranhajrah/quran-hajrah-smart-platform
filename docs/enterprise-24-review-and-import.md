@@ -6,13 +6,14 @@ Open a Knowledge Center document and choose **تحليل المستند**. Analy
 
 ## Review evidence
 
-The review center groups proposals by type and filters by decision, confidence, and page. Selecting a proposal shows:
+The review center groups proposals into Arabic institutional groups: beneficiaries, operational objectives, KPIs, initiatives, responsibilities, dates, budget, risks, and other data. It also shows document-level counts and filters by decision, confidence, page, and proposal type. Selecting a proposal shows:
 
 - originating document and version;
 - page and source section;
 - bounded evidence snippet;
 - proposed fields and confidence;
 - proposed import target;
+- parent and child proposals;
 - extracted page text where available.
 
 Confidence is a rule signal, not proof. The reviewer must compare the proposal to the source.
@@ -42,6 +43,8 @@ Incomplete proposals can only be skipped until an authorized reviewer supplies e
 Import requires `document_analysis.import` and an explicit confirmation. One database transaction covers target changes, import items, source evidence, and job status. A failed target operation rolls back the complete batch. The `Idempotency-Key` prevents duplicate replay.
 
 Supported targets are strategic objectives, KPIs, metrics, metric values, initiatives, milestones, risks, treatments, executive alerts, executive report sections, budget records, and budget lines. Proposals with target `NONE` are review information only.
+
+Parent targets are imported before their children. A KPI or initiative receives the target ID of its approved objective relation, and a budget line receives the imported budget ID. A skipped parent leaves the dependent child incomplete unless the parent already maps to an existing target. Beneficiary groups default to `NONE`; importing one as a live metric value requires the reviewer to choose that target explicitly and provide a metric and measurement date.
 
 ## After import
 
