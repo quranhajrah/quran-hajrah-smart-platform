@@ -2,7 +2,7 @@
 
 Production TypeScript monorepo for the Quran Hajrah Smart Platform. It includes secure identity/RBAC, the Institutional Knowledge Center, the Executive Intelligence Platform, and the Institutional Document Intelligence Engine.
 
-Current release: `24.2.0` — Enterprise 24.2 Production-Structure Semantic Assembly.
+Current release: `24.2.1` — Enterprise 24.2.1 Analysis Identity and Strategic Reconstruction.
 
 ## Structure
 
@@ -136,7 +136,7 @@ The deterministic semantic mapper reconstructs safely recognized RTL visual-orde
 
 The admin analysis center is `/document-analysis`. The API is under `/api/document-analysis`, with explicit analysis start at `POST /api/documents/:id/analyze`. Analysis is never triggered automatically during upload.
 
-The base migration is `20260724_enterprise_24_document_intelligence`; Enterprise 24.1 adds the non-destructive migration `20260726_enterprise_24_1_semantic_extraction`. Enterprise 24.2 requires no schema migration. The production seed adds analysis permissions, safe role defaults, versioned deterministic rule identifiers, and processing limits without seeding document-derived values. Scheduler-ready analysis alerts can be generated with:
+The base migration is `20260724_enterprise_24_document_intelligence`; Enterprise 24.1 adds the non-destructive migration `20260726_enterprise_24_1_semantic_extraction`. Enterprise 24.2 and 24.2.1 require no schema migration. In 24.2.1 the review summary exposes job identity and the semantic extraction version, forced reanalysis always creates a new job, older semantic results are not reused, and strategic-axis titles are reconstructed from evidence instead of accepting ordinal-only values. The production seed adds analysis permissions, safe role defaults, versioned deterministic rule identifiers, and processing limits without seeding document-derived values. Scheduler-ready analysis alerts can be generated with:
 
 ```bash
 npm run document-analysis:alerts
@@ -151,6 +151,8 @@ npm run document-analysis:alerts
 - [Enterprise 24.1 semantic extraction guide](docs/enterprise-24-1-semantic-extraction.md)
 - [Enterprise 24.2 semantic assembly guide](docs/enterprise-24-2-semantic-assembly.md)
 - [Enterprise 24.2 validation report](docs/phase-24-2-validation-report.md)
+- [Enterprise 24.2.1 identity and strategic reconstruction](docs/enterprise-24-2-1-analysis-identity.md)
+- [Enterprise 24.2.1 validation report](docs/phase-24-2-1-validation-report.md)
 - [Review and import guide](docs/enterprise-24-review-and-import.md)
 - [Extraction methodology](docs/extraction-methodology.md)
 - [Source traceability](docs/source-traceability.md)

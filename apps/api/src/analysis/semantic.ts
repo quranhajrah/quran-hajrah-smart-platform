@@ -201,7 +201,7 @@ const semanticLines = (
 };
 
 const logicalLabelPattern =
-  /^(?:الهدف\s+(?:الفرعي|التشغيلي)(?:\s+(?:الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|\d+))?|الهدف\s*(?:رقم)?\s*\d+|المؤشر|مؤشر\s+(?:الانجاز|الاداء)|معيار\s+القياس|المبادرة|المشروع|البرنامج|النشاط|خطة\s+العمل|الاجراء\s+التنفيذي|المسؤول\s+عن\s+التنفيذ|الجهة\s+المسؤولة|الادارة\s+المسؤولة|تاريخ\s+البدء|تاريخ\s+الانتهاء|الفئة\s+المستهدفة|العدد|اجمالي\s+(?:الموازنة|الميزانية|التكلفة)|الموازنة\s+المقترحة|الاجمالي|المجموع)\s*[:-]?$/u;
+  /^(?:المحور(?:\s+الاستراتيجي)?(?:\s+(?:الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|السادس|السادسة|السابع|السابعة|الثامن|الثامنة|التاسع|التاسعة|العاشر|العاشرة|\d+))?|الهدف\s+(?:الفرعي|التشغيلي)(?:\s+(?:الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|\d+))?|الهدف\s*(?:رقم)?\s*\d+|المؤشر|مؤشر\s+(?:الانجاز|الاداء)|معيار\s+القياس|المبادرة|المشروع|البرنامج|النشاط|خطة\s+العمل|الاجراء\s+التنفيذي|المسؤول\s+عن\s+التنفيذ|الجهة\s+المسؤولة|الادارة\s+المسؤولة|تاريخ\s+البدء|تاريخ\s+الانتهاء|الفئة\s+المستهدفة|العدد|اجمالي\s+(?:الموازنة|الميزانية|التكلفة)|الموازنة\s+المقترحة|الاجمالي|المجموع)\s*[:-]?$/u;
 const logicalNumberPattern = /^[0-9٠-٩۰-۹][0-9٠-٩۰-۹٬,.\s]*(?:ريال|ر\.?\s*س|SAR)?$/iu;
 const logicalBeneficiaryGroupPattern =
   /^(?:من\s+كبار\s+السن|طالب(?:ا|ًا|اً)?\s*وطالبة|معلم(?:ا|ًا|اً)?\s*ومعلمة|طلاب|طالبات|طالب(?:ا|ًا|اً)?|طالبة|معلمون|معلمات|رجل(?:ا|ًا|اً)?|امرأة)$/u;
@@ -209,6 +209,11 @@ const logicalCompositeLabelPattern =
   /^(?:الموازنة\s+المقترحة|مؤشرات\s+الانجاز|المسؤول\s+عن\s+التنفيذ|تاريخ\s+البدء|تاريخ\s+الانتهاء|الفئة\s+المستهدفة|خطة\s+العمل)$/u;
 const logicalBudgetLabelPattern =
   /^(?:اجمالي\s+(?:الموازنة|الميزانية|التكلفة)|الموازنة\s+المقترحة|الاجمالي|المجموع)$/u;
+const strategicAxisPrefixPattern = /^المحور(?:\s+الاستراتيجي)?$/u;
+const ordinalTokenPattern =
+  /^(?:الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|السادس|السادسة|السابع|السابعة|الثامن|الثامنة|التاسع|التاسعة|العاشر|العاشرة|\d+)$/u;
+const strategicAxisLabelPattern =
+  /^المحور(?:\s+الاستراتيجي)?\s+(?:الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|السادس|السادسة|السابع|السابعة|الثامن|الثامنة|التاسع|التاسعة|العاشر|العاشرة|\d+)\s*[:-]?$/u;
 
 const combineLogicalLines = (
   source: SemanticLine[],
@@ -243,6 +248,84 @@ export const assembleLogicalLines = (lines: SemanticLine[]) => {
     const currentNormalized = matchText(current.text);
     const nextNormalized = matchText(next.text);
     const joinedLabel = matchText(`${current.text} ${next.text}`);
+
+    if (
+      strategicAxisPrefixPattern.test(currentNormalized) &&
+      ordinalTokenPattern.test(nextNormalized) &&
+      third?.pageNumber === current.pageNumber &&
+      meaningfulTitle(third.text) &&
+      !logicalLabelPattern.test(matchText(third.text)) &&
+      !sectionHeading(third.text)
+    ) {
+      const fourth = lines[index + 3];
+      const titleLines = [third];
+      if (
+        fourth?.pageNumber === current.pageNumber &&
+        meaningfulTitle(fourth.text) &&
+        !logicalLabelPattern.test(matchText(fourth.text)) &&
+        !sectionHeading(fourth.text)
+      ) {
+        titleLines.push(fourth);
+      }
+      output.push(
+        combineLogicalLines(
+          [current, next, ...titleLines],
+          `${currentNormalized} ${nextNormalized}: ${titleLines
+            .map((line) => matchText(line.text))
+            .join(' ')}`,
+          [current, next, ...titleLines].map((line) => line.text).join(' | '),
+        ),
+      );
+      index += 1 + titleLines.length;
+      continue;
+    }
+
+    if (
+      strategicAxisLabelPattern.test(currentNormalized) &&
+      meaningfulTitle(next.text) &&
+      !logicalLabelPattern.test(nextNormalized) &&
+      !sectionHeading(next.text)
+    ) {
+      const titleLines = [next];
+      if (
+        third?.pageNumber === current.pageNumber &&
+        meaningfulTitle(third.text) &&
+        !logicalLabelPattern.test(matchText(third.text)) &&
+        !sectionHeading(third.text)
+      ) {
+        titleLines.push(third);
+      }
+      output.push(
+        combineLogicalLines(
+          [current, ...titleLines],
+          `${currentNormalized.replace(/[:-]\s*$/u, '')}: ${titleLines
+            .map((line) => matchText(line.text))
+            .join(' ')}`,
+          [current, ...titleLines].map((line) => line.text).join(' | '),
+        ),
+      );
+      index += titleLines.length;
+      continue;
+    }
+
+    if (
+      meaningfulTitle(current.text) &&
+      meaningfulTitle(next.text) &&
+      !logicalLabelPattern.test(currentNormalized) &&
+      !logicalLabelPattern.test(nextNormalized) &&
+      third?.pageNumber === current.pageNumber &&
+      strategicAxisLabelPattern.test(matchText(third.text))
+    ) {
+      output.push(
+        combineLogicalLines(
+          [current, next, third],
+          `${matchText(third.text).replace(/[:-]\s*$/u, '')}: ${currentNormalized} ${nextNormalized}`,
+          `${current.text} | ${next.text} | ${third.text}`,
+        ),
+      );
+      index += 2;
+      continue;
+    }
     if (
       logicalCompositeLabelPattern.test(joinedLabel) &&
       third?.pageNumber === current.pageNumber &&
@@ -322,6 +405,7 @@ export const assembleLogicalLines = (lines: SemanticLine[]) => {
     if (
       logicalLabelPattern.test(nextNormalized) &&
       meaningfulTitle(current.text) &&
+      !logicalLabelPattern.test(currentNormalized) &&
       !sectionHeading(current.text)
     ) {
       output.push(
@@ -453,6 +537,7 @@ const genericHeadingValues = new Set(
 const meaningfulTitle = (value: string) => {
   const normalized = matchText(value).replace(/^[-:.\s]+|[-:.\s]+$/g, '');
   if (normalized.length < 4 || genericHeadingValues.has(normalized)) return false;
+  if (ordinalTokenPattern.test(normalized)) return false;
   if (/^\d+(?:\s*[-/]\s*\d+)*$/u.test(normalized)) return false;
   if (/^(?:الاهداف الفرعية|المؤشرات|الموازنة)\s*[-:]\s*\d+$/u.test(normalized)) {
     return false;
@@ -1453,4 +1538,78 @@ export const extractOperationalSemanticProposals = (input: InstitutionalExtracti
     ...tableCandidates.proposals,
     ...budgetCandidates,
   ]);
+};
+
+const strategicAxisCandidatePattern =
+  /^المحور(?:\s+الاستراتيجي)?\s*(?<ordinal>الاول|الاولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|السادس|السادسة|السابع|السابعة|الثامن|الثامنة|التاسع|التاسعة|العاشر|العاشرة|\d+)\s*(?:[:-]\s*|\s+)(?<title>.+)$/u;
+
+const strategicAxisTitleFromEvidence = (evidence: string) => {
+  const parts = evidence
+    .split(' | ')
+    .map((part) => normalizeInstitutionalText(part))
+    .filter(Boolean);
+  const titleParts: string[] = [];
+  for (const part of parts) {
+    const normalized = matchText(part);
+    if (
+      strategicAxisPrefixPattern.test(normalized) ||
+      ordinalTokenPattern.test(normalized) ||
+      strategicAxisLabelPattern.test(normalized)
+    ) {
+      continue;
+    }
+    const inlineTitle = part
+      .replace(
+        /^المحور(?:\s+الاستراتيجي)?\s*(?:الأول|الأولى|الثاني|الثانية|الثالث|الثالثة|الرابع|الرابعة|الخامس|الخامسة|السادس|السادسة|السابع|السابعة|الثامن|الثامنة|التاسع|التاسعة|العاشر|العاشرة|\d+)\s*[:-]?\s*/u,
+        '',
+      )
+      .trim();
+    if (inlineTitle) titleParts.push(inlineTitle);
+  }
+  return titleParts.join(' ').trim();
+};
+
+export const extractStrategicSemanticProposals = (input: InstitutionalExtractionInput) => {
+  const sections = detectInstitutionalSections(input.pages, input.tables);
+  const lines = assembleLogicalLines(semanticLines(input, sections));
+  const proposals: ExtractionProposalCandidate[] = [];
+
+  for (const line of lines) {
+    const match = strategicAxisCandidatePattern.exec(line.normalized);
+    const ordinal = match?.groups?.ordinal?.trim();
+    const title = strategicAxisTitleFromEvidence(line.evidence) || match?.groups?.title?.trim();
+    if (!ordinal || !title || !meaningfulTitle(title)) continue;
+    const sequenceNumber = ordinalNumber(ordinal);
+    proposals.push(
+      makeCandidate({
+        proposalType: 'OTHER',
+        title,
+        rule: 'section.strategic_axis.v1',
+        confidence: sequenceNumber === null ? 0.86 : 0.95,
+        page: line.pageNumber,
+        section: 'المحاور الاستراتيجية',
+        evidence: line.evidence,
+        fields: [
+          proposalField('strategicAxis', 'المحور الاستراتيجي', 'string', title, title, 0.96),
+          proposalField('ordinal', 'ترتيب المحور', 'string', ordinal, ordinal, 0.95),
+          ...(sequenceNumber === null
+            ? []
+            : [
+                proposalField(
+                  'sequenceNumber',
+                  'الرقم التسلسلي',
+                  'number',
+                  sequenceNumber,
+                  ordinal,
+                  0.95,
+                ),
+              ]),
+          lineSourceReferenceField(line),
+        ],
+        key: candidateKey('strategic-axis', line.pageNumber, `${ordinal}|${title}`),
+      }),
+    );
+  }
+
+  return applyProposalQualityGates(proposals);
 };

@@ -12,8 +12,10 @@ import {
 } from './api';
 import { useAuth } from './auth';
 import {
+  analysisJobDiagnostics,
   buildExtractionSummary,
   groupAnalysisProposals,
+  sameJobRetryLabel,
   shouldShowAnalysisFailure,
 } from './document-analysis-view';
 
@@ -309,6 +311,7 @@ export function DocumentAnalysisReview() {
       ),
     [job?.pageCount, job?.tableCount, pages.length, proposals, tables.length],
   );
+  const diagnostics = useMemo(() => (job ? analysisJobDiagnostics(job) : null), [job]);
 
   function choose(proposal: AnalysisProposal) {
     setSelected(proposal);
@@ -457,7 +460,7 @@ export function DocumentAnalysisReview() {
                     .catch((cause) => setError(String(cause)))
                 }
               >
-                إعادة التحليل
+                {sameJobRetryLabel}
               </button>
             )}
           {can('document_analysis.run') && ['QUEUED', 'PROCESSING'].includes(job.status) && (
@@ -481,6 +484,26 @@ export function DocumentAnalysisReview() {
           )}
         </div>
       </div>
+      {diagnostics && (
+        <dl className="analysis-job-diagnostics" aria-label="بيانات مهمة التحليل">
+          <div>
+            <dt>معرّف المهمة</dt>
+            <dd dir="ltr">{diagnostics.jobId}</dd>
+          </div>
+          <div>
+            <dt>إصدار الاستخراج</dt>
+            <dd dir="ltr">{diagnostics.extractionVersion}</dd>
+          </div>
+          <div>
+            <dt>تاريخ إنشاء المهمة</dt>
+            <dd>{new Date(diagnostics.createdAt).toLocaleString('ar-SA')}</dd>
+          </div>
+          <div>
+            <dt>نوع المستند</dt>
+            <dd dir="ltr">{diagnostics.documentType}</dd>
+          </div>
+        </dl>
+      )}
       {shouldShowAnalysisFailure(job.status) && job.failureReason && (
         <StatusMessage error>{job.failureReason}</StatusMessage>
       )}

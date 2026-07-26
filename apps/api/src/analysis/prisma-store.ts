@@ -963,7 +963,7 @@ export class PrismaAnalysisStore implements AnalysisStore {
                   normalizedText: page.text,
                   characterCount: page.text.length,
                   extractionMethod: input.extractionMethod,
-                  extractionVersion: input.providerVersion,
+                  extractionVersion: input.extractionVersion,
                 },
               },
               tables: {
@@ -1051,7 +1051,7 @@ export class PrismaAnalysisStore implements AnalysisStore {
             where: { id: jobId },
             data: {
               extractionProvider: input.provider,
-              extractionVersion: input.providerVersion,
+              extractionVersion: input.extractionVersion,
               extractionMethod: input.extractionMethod,
               providerMetadata: prismaJson(input.metadata),
               pageCount: input.pages.length,

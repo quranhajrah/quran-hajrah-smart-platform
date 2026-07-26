@@ -10,10 +10,11 @@ const page = (pageNumber: number, text: string): ExtractedPageData => ({
 });
 
 /**
- * Sanitized structural reproduction of the production PDF layout.
+ * Sanitized structural reproduction of the production UAT-reported shape.
  *
  * It deliberately keeps only generic institutional labels and acceptance-test
  * numbers. It contains no confidential document prose, names, or file content.
+ * It was not exported from an authenticated production analysis job.
  */
 export const enterprise242ProductionStructureFixture = (): InstitutionalExtractionInput => ({
   documentType: 'OPERATIONAL_PLAN',
@@ -115,7 +116,7 @@ export const enterprise242ProductionStructureFixture = (): InstitutionalExtracti
         ['530000', 'الإجمالي', '', '', '', '', '', '', ''],
       ],
       confidence: 0.94,
-      extractionMethod: 'sanitized-production-structure',
+      extractionMethod: 'sanitized-uat-reported-structure',
     },
   ],
 });

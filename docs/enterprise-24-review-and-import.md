@@ -2,7 +2,12 @@
 
 ## Start analysis
 
-Open a Knowledge Center document and choose **تحليل المستند**. Analysis is explicit and is never started during upload. Reanalysis creates a distinct job for the current immutable version; the normal start action reuses the same fingerprint when an equivalent job already exists.
+Open a Knowledge Center document and choose **تحليل المستند**. Analysis is explicit and is never started during upload.
+
+- **إعادة المحاولة** is available on a failed, cancelled, or OCR-required review and reruns the same job ID after clearing its failure state.
+- **إعادة التحليل** is available from the document details page after any prior job exists. It sends a forced request, creates a distinct job ID, and opens that exact new review URL.
+
+An unforced request may reuse only an equivalent successful job created with the current semantic extraction version. The review summary displays the job ID, semantic extraction version, creation time, and document type so the reviewer can verify lifecycle identity before accepting results.
 
 ## Review evidence
 

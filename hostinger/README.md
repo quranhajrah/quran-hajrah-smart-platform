@@ -67,6 +67,8 @@ Enterprise 24.1 adds the additive migration `20260726_enterprise_24_1_semantic_e
 
 Enterprise 24.2 adds no migration and changes no Hostinger setting. Deploy with the existing build lifecycle and keep `apps/api/dist/server.js` as the entry file. After deployment, reanalyze the production operational plan and complete the live checklist in `docs/enterprise-24-2-semantic-assembly.md`.
 
+Enterprise 24.2.1 also adds no migration or environment variable. After deployment, use **إعادة التحليل** from the document page, verify that the review URL has a new job ID and that the review summary reports extraction version `24.2.1`, then re-run the strategic-plan and operational-plan UAT checklist. **إعادة المحاولة** intentionally retains the existing job ID and is not a substitute for release-version acceptance.
+
 The seed adds seven analysis permissions, safe role defaults, deterministic rule identifiers, and the bounded default analysis configuration. It never seeds extracted values.
 
 After deployment, use an authorized account to open a non-sensitive supported document, start analysis explicitly, inspect pages/tables/proposals, approve one evidence-backed proposal, run conflict preview, and confirm import. Open the imported Enterprise 23 record and verify “عرض المصدر”. An image-only PDF must report `OCR_REQUIRED`.

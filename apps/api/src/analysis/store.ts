@@ -19,7 +19,7 @@ import type {
 
 export type SaveExtractionInput = {
   provider: string;
-  providerVersion: string;
+  extractionVersion: string;
   extractionMethod: string;
   metadata: Record<string, unknown>;
   pages: Array<{

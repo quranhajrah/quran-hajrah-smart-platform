@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 import type { DocumentType } from '../documents/types.js';
 import { normalizeInstitutionalText } from './providers.js';
-import { extractOperationalSemanticProposals } from './semantic.js';
+import {
+  applyProposalQualityGates,
+  extractOperationalSemanticProposals,
+  extractStrategicSemanticProposals,
+} from './semantic.js';
 import type {
   ExtractedPageData,
   ExtractedTableData,
@@ -607,6 +611,15 @@ export class StrategicPlanExtractor extends RuleBasedExtractor {
     'RESPONSIBLE_DEPARTMENT',
     'DOCUMENT_DATE',
   ]);
+  extract(input: InstitutionalExtractionInput) {
+    const legacy = super
+      .extract(input)
+      .filter((proposal) => proposal.extractionRuleId !== 'section.strategic_axis.v1');
+    return applyProposalQualityGates([
+      ...legacy,
+      ...extractStrategicSemanticProposals(input),
+    ]);
+  }
   supports(documentType: DocumentType) {
     return documentType === 'STRATEGIC_PLAN';
   }

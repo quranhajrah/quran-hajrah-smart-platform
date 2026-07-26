@@ -110,4 +110,6 @@ Enterprise 24.1 adds only a deterministic semantic mapping layer inside the same
 
 Enterprise 24.2 adds an in-memory logical record assembler before those rules. It joins recognized adjacent labels/values and maps split or RTL-reversed table headers while retaining source page/line/table/row/cell references. It adds no schema, migration, service, environment variable, or startup dependency.
 
+Enterprise 24.2.1 gives every analysis job an application-owned semantic extraction version independent of its parser/provider version. That semantic version participates in the job fingerprint; unforced requests cannot reuse older-rule results, and forced reanalysis creates a new fingerprint and job ID. Provider versions remain diagnostic metadata. Strategic-plan axis reconstruction now uses the same evidence-preserving logical assembly and proposal quality gates. No schema, migration, environment variable, or Hostinger entry-file change is required.
+
 `npm run document-analysis:alerts` is the scheduler-ready command for failed analysis, overdue review, approved-but-not-imported proposals, and unresolved conflicts. It is not scheduled inside the API process.

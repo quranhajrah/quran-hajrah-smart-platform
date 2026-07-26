@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalysisProposal } from './api';
 import {
+  analysisJobDiagnostics,
+  analysisRequestPath,
+  analysisReviewPath,
   buildExtractionSummary,
+  forcedReanalysisLabel,
   groupAnalysisProposals,
+  sameJobRetryLabel,
   shouldShowAnalysisFailure,
 } from './document-analysis-view';
 
@@ -69,5 +74,50 @@ describe('document analysis review presentation', () => {
     expect(shouldShowAnalysisFailure('OCR_REQUIRED')).toBe(true);
     expect(shouldShowAnalysisFailure('PROPOSALS_READY')).toBe(false);
     expect(shouldShowAnalysisFailure('IMPORTED')).toBe(false);
+  });
+
+  it('keeps forced reanalysis and same-job retry lifecycle semantics distinct', () => {
+    const documentId = crypto.randomUUID();
+    const currentJobId = crypto.randomUUID();
+    const newJobId = crypto.randomUUID();
+
+    expect(analysisRequestPath(documentId, true)).toBe(
+      `/documents/${documentId}/analyze?force=true`,
+    );
+    expect(analysisReviewPath(newJobId)).toBe(`/document-analysis/jobs/${newJobId}`);
+    expect(analysisReviewPath(newJobId)).not.toBe(analysisReviewPath(currentJobId));
+    expect(forcedReanalysisLabel).toBe('إعادة التحليل');
+    expect(sameJobRetryLabel).toBe('إعادة المحاولة');
+  });
+
+  it('builds explicit review diagnostics from the newly selected job', () => {
+    const jobId = crypto.randomUUID();
+    const createdAt = '2026-07-27T06:00:00.000Z';
+    expect(
+      analysisJobDiagnostics({
+        id: jobId,
+        documentId: crypto.randomUUID(),
+        documentVersionId: crypto.randomUUID(),
+        status: 'PROPOSALS_READY',
+        extractionVersion: '24.2.1',
+        pageCount: 3,
+        tableCount: 1,
+        proposalCount: 10,
+        createdAt,
+        updatedAt: createdAt,
+        document: {
+          id: crypto.randomUUID(),
+          title: 'خطة تشغيلية',
+          confidentialityLevel: 'CONFIDENTIAL',
+          documentType: 'OPERATIONAL_PLAN',
+          versionNumber: 1,
+        },
+      }),
+    ).toEqual({
+      jobId,
+      extractionVersion: '24.2.1',
+      createdAt,
+      documentType: 'OPERATIONAL_PLAN',
+    });
   });
 });

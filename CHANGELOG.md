@@ -4,6 +4,16 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ## Unreleased
 
+## [24.2.1] - 2026-07-27
+
+### Enterprise 24.2.1 Analysis Identity and Strategic Reconstruction
+
+- Separated the semantic extraction version (`24.2.1`) from PDF/DOCX/TXT provider versions and retained provider identity only in provider metadata.
+- Added the semantic version to the stable analysis fingerprint, invalidating reusable jobs from older semantic releases while ensuring forced reanalysis always creates a distinct job.
+- Distinguished same-job **إعادة المحاولة** from new-job **إعادة التحليل**, navigated directly to the new job, and displayed job ID, extraction version, creation time, and document type in the review summary.
+- Applied evidence-preserving logical assembly and quality gates to strategic plans, joining split/multiline axis labels and rejecting ordinal-only axis proposals.
+- Added lifecycle, fingerprint, review-action, strategic-axis, and existing operational-plan acceptance regression coverage without a schema migration.
+
 ## [24.2.0] - 2026-07-26
 
 ### Enterprise 24.2 Production-Structure Semantic Assembly

@@ -11,6 +11,11 @@ import { ExtractionProviderRegistry } from './providers.js';
 import { InstitutionalExtractionService } from './rules.js';
 import type { AnalysisStore } from './store.js';
 import { AnalysisPipelineError } from './types.js';
+import {
+  createForcedAnalysisFingerprint,
+  createStableAnalysisFingerprint,
+  semanticExtractionVersion,
+} from './version.js';
 import type {
   AnalysisListQuery,
   AnalysisPipelineStage,
@@ -158,21 +163,22 @@ export class DocumentAnalysisService {
       );
     }
     const version = await this.currentVersion(document);
-    const stableFingerprint = createHash('sha256')
-      .update(
-        [
-          document.id,
-          version.id,
-          version.checksum,
-          configuration.providerVersion,
-          [...configuration.enabledRuleIds].sort().join(','),
-        ].join('|'),
-      )
-      .digest('hex');
-    const fingerprint = force
-      ? createHash('sha256').update(`${stableFingerprint}|${randomUUID()}`).digest('hex')
+    const stableFingerprint = createStableAnalysisFingerprint({
+      documentId: document.id,
+      documentVersionId: version.id,
+      checksum: version.checksum,
+      enabledRuleIds: configuration.enabledRuleIds,
+    });
+    let fingerprint = force
+      ? createForcedAnalysisFingerprint(stableFingerprint)
       : stableFingerprint;
-    const existing = force ? null : await this.analysisStore.findJobByFingerprint(fingerprint);
+    let existing = force ? null : await this.analysisStore.findJobByFingerprint(fingerprint);
+    const versionInvalidated =
+      existing !== null && existing.extractionVersion !== semanticExtractionVersion;
+    if (existing && versionInvalidated) {
+      fingerprint = createForcedAnalysisFingerprint(stableFingerprint);
+      existing = null;
+    }
     if (existing && existing.status !== 'FAILED' && existing.status !== 'CANCELLED') {
       return { job: existing, reused: true };
     }
@@ -182,7 +188,7 @@ export class DocumentAnalysisService {
         documentId: document.id,
         documentVersionId: version.id,
         fingerprint,
-        extractionVersion: configuration.providerVersion,
+        extractionVersion: semanticExtractionVersion,
         requestedById: user.id,
         reviewDueAt: new Date(Date.now() + configuration.reviewSlaHours * 3_600_000),
       }));
@@ -192,7 +198,11 @@ export class DocumentAnalysisService {
       userId: user.id,
       action: existing ? 'ANALYSIS_RETRIED' : 'ANALYSIS_REQUESTED',
       description: existing ? 'Document analysis retry requested.' : 'Document analysis requested.',
-      metadata: force ? { forcedReanalysis: true } : undefined,
+      metadata: force
+        ? { forcedReanalysis: true }
+        : versionInvalidated
+          ? { semanticVersionInvalidated: true, extractionVersion: semanticExtractionVersion }
+          : undefined,
       ...context,
     });
     this.runInBackground(job.id, document, version);
@@ -578,11 +588,17 @@ export class DocumentAnalysisService {
           status: 'OCR_REQUIRED',
           extractionProvider: extraction.provider,
           extractionMethod: extraction.extractionMethod,
-          extractionVersion: extraction.providerVersion,
+          extractionVersion: semanticExtractionVersion,
           completedAt: new Date(),
           pageCount: extraction.pages.length,
           tableCount: extraction.pages.reduce((sum, page) => sum + page.tables.length, 0),
-          providerMetadata: extraction.metadata,
+          providerMetadata: {
+            ...extraction.metadata,
+            provider: {
+              name: extraction.provider,
+              version: extraction.providerVersion,
+            },
+          },
           failureReason:
             'لم يُعثر على نص مضمّن كافٍ. يحتاج المستند إلى OCR، وهي خدمة غير مفعلة في هذا الإصدار.',
         });
@@ -610,9 +626,15 @@ export class DocumentAnalysisService {
       reportStage('page_creation', 'started');
       await this.analysisStore.saveExtraction(jobId, {
         provider: extraction.provider,
-        providerVersion: extraction.providerVersion,
+        extractionVersion: semanticExtractionVersion,
         extractionMethod: extraction.extractionMethod,
-        metadata: extraction.metadata,
+        metadata: {
+          ...extraction.metadata,
+          provider: {
+            name: extraction.provider,
+            version: extraction.providerVersion,
+          },
+        },
         pages: extraction.pages,
         proposals,
         reportStage: transitionStage,
@@ -628,6 +650,7 @@ export class DocumentAnalysisService {
           pageCount: extraction.pages.length,
           tableCount: tables.length,
           proposalCount: proposals.length,
+          extractionVersion: semanticExtractionVersion,
         },
       });
       reportStage('audit', 'completed');

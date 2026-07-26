@@ -424,7 +424,7 @@ async function main() {
     where: { key: 'institutional-default' },
     update: {
       isActive: true,
-        providerVersion: 'enterprise-24.1-semantic-v2',
+      providerVersion: '24.2.1',
       maxFileSizeBytes: 26_214_400,
       maxPages: 500,
       maxTables: 300,
@@ -454,7 +454,7 @@ async function main() {
     create: {
       key: 'institutional-default',
       isActive: true,
-        providerVersion: 'enterprise-24.1-semantic-v2',
+      providerVersion: '24.2.1',
       maxFileSizeBytes: 26_214_400,
       maxPages: 500,
       maxTables: 300,

@@ -28,14 +28,16 @@ TXT is decoded as UTF-8 after file-size and basic binary-content checks. It yiel
 
 ## Logical assembly and rules
 
-Enterprise 24.2 first assembles an in-memory logical view. It joins recognized multiline labels and values, supports value-before-label RTL order, combines split beneficiary counts/groups, merges split table headers, maps physical columns independently of direction, and carries explicitly merged objective/category cells. Raw page text and stored table cells remain unchanged.
+Enterprise 24.2 first assembles an in-memory logical view. It joins recognized multiline labels and values, supports value-before-label RTL order, combines split beneficiary counts/groups, merges split table headers, maps physical columns independently of direction, and carries explicitly merged objective/category cells. Enterprise 24.2.1 applies the same evidence-preserving assembly to strategic axes, including ordinal-before-title, ordinal-after-title, and multiline title layouts. Raw page text and stored table cells remain unchanged.
 
 Versioned rules then detect document sections and map explicit Arabic headings and table headers to objectives, KPIs, initiatives, milestones, responsible departments, beneficiaries, dates, budget totals/lines, risks/treatments, governance scores, financial values, policy obligations, and reporting periods. Adjacent line fields and same-row table fields are attached to their entity. Specialized extractors limit applicable proposal types by document type.
 
 A rule result includes proposal type, structured fields, page, section/table, evidence, confidence, extraction method, and rule identifier. Configuration can disable a document type or rule and can raise the confidence threshold.
 
-Quality gates require a source page, bounded evidence, meaningful semantic content, and at least one field value present in evidence. Heading-only, numeric-only, duplicate normalized titles, navigation/header/footer artifacts, and orphaned relationship links are rejected. Useful ambiguous table mappings receive a confidence penalty and `NEEDS_REVIEW`; unsupported values are never fabricated.
+Quality gates require a source page, bounded evidence, meaningful semantic content, and at least one field value present in evidence. Heading-only, numeric-only, ordinal-only, duplicate normalized titles, navigation/header/footer artifacts, and orphaned relationship links are rejected. Useful ambiguous table mappings receive a confidence penalty and `NEEDS_REVIEW`; unsupported values are never fabricated.
+
+The job's `extractionVersion` is the semantic ruleset version, currently `24.2.1`. Parser/provider versions such as PDF.js are stored only under provider metadata. The semantic version participates in the stable fingerprint, so a job from an older ruleset cannot be reused by an unforced analysis.
 
 ## OCR and future providers
 
-When embedded text is below the configured minimum, the job becomes `OCR_REQUIRED`. Enterprise 24.2 does not perform OCR. Its “semantic” mapping is deterministic local rule processing—not semantic AI. LLM structured extraction, embeddings, and reranking remain interfaces only and make no network call.
+When embedded text is below the configured minimum, the job becomes `OCR_REQUIRED`. Enterprise 24.2.1 does not perform OCR. Its “semantic” mapping is deterministic local rule processing—not semantic AI. LLM structured extraction, embeddings, and reranking remain interfaces only and make no network call.

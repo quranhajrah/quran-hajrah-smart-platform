@@ -1525,6 +1525,29 @@ td small {
   font-weight: 700;
 }
 
+.analysis-job-diagnostics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.9rem;
+  border: 1px solid #dce8e1;
+  border-radius: 12px;
+  background: #f4f8f6;
+}
+.analysis-job-diagnostics div {
+  min-width: 0;
+}
+.analysis-job-diagnostics dt {
+  color: #71857d;
+  font-size: 0.8rem;
+}
+.analysis-job-diagnostics dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
 @media (max-width: 1100px) {
   .executive-summary-grid {
     grid-template-columns: repeat(3, 1fr);

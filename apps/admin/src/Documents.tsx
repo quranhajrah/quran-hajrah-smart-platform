@@ -15,6 +15,11 @@ import {
   type OwningDepartment,
 } from './api';
 import { useAuth } from './auth';
+import {
+  analysisRequestPath,
+  analysisReviewPath,
+  forcedReanalysisLabel,
+} from './document-analysis-view';
 
 const documentTypes: Record<string, string> = {
   STRATEGIC_PLAN: 'خطة استراتيجية',
@@ -731,11 +736,11 @@ export function DocumentDetails() {
     setError('');
     try {
       const result = await api<{ job: AnalysisJob; reused: boolean }>(
-        `/documents/${id}/analyze${analysisJobs.length > 0 ? '?force=true' : ''}`,
+        analysisRequestPath(id, analysisJobs.length > 0),
         { method: 'POST' },
       );
       await load();
-      window.location.assign(`/document-analysis/jobs/${result.job.id}`);
+      window.location.assign(analysisReviewPath(result.job.id));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'تعذر بدء تحليل المستند.');
     } finally {
@@ -850,7 +855,7 @@ export function DocumentDetails() {
               </div>
               {can('document_analysis.run') && document.hasFile && (
                 <button disabled={busy} onClick={() => void startAnalysis()}>
-                  {analysisJobs.length > 0 ? 'إعادة التحليل' : 'تحليل المستند'}
+                  {analysisJobs.length > 0 ? forcedReanalysisLabel : 'تحليل المستند'}
                 </button>
               )}
             </div>

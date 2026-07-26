@@ -1,7 +1,23 @@
-import type { AnalysisProposal } from './api';
+import type { AnalysisJob, AnalysisProposal } from './api';
 
 export const shouldShowAnalysisFailure = (status: string) =>
   status === 'FAILED' || status === 'OCR_REQUIRED';
+
+export const sameJobRetryLabel = 'إعادة المحاولة';
+export const forcedReanalysisLabel = 'إعادة التحليل';
+
+export const analysisRequestPath = (documentId: string, force: boolean) =>
+  `/documents/${encodeURIComponent(documentId)}/analyze${force ? '?force=true' : ''}`;
+
+export const analysisReviewPath = (jobId: string) =>
+  `/document-analysis/jobs/${encodeURIComponent(jobId)}`;
+
+export const analysisJobDiagnostics = (job: AnalysisJob) => ({
+  jobId: job.id,
+  extractionVersion: job.extractionVersion,
+  createdAt: job.createdAt,
+  documentType: job.document?.documentType ?? 'UNKNOWN',
+});
 
 const groupOrder = [
   'الفئات المستهدفة',
