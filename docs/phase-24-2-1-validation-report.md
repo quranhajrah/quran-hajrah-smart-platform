@@ -40,6 +40,7 @@ The safe transformation contract for a future authorized capture is documented i
 - `npm run smoke:production`: passed for compiled server startup, logging, health/readiness behavior, admin/portal static assets, Knowledge Center, Executive Intelligence, Document Intelligence, and protected routes.
 - `npm audit --omit=dev --audit-level=high`: passed with zero production vulnerabilities.
 - `npm run security:check`: passed; no sensitive filenames were detected.
+- [GitHub Actions run 30225618321](https://github.com/quranhajrah/quran-hajrah-smart-platform/actions/runs/30225618321): passed for implementation commit `99bb5f653bea73f1ba43ea496f63095c794f4290`; both `validate` and `production` jobs completed successfully.
 
 The clean development install reports advisories only in omitted development tooling. Production dependency audit is zero.
 
@@ -61,7 +62,6 @@ The clean development install reports advisories only in omitted development too
 
 ## Remaining acceptance
 
-- GitHub Actions must pass after push.
 - Hostinger must deploy the commit.
 - `/health` and `/ready` must be verified live.
 - An authorized user must force-reanalyze the real strategic and operational plans.
@@ -70,4 +70,4 @@ The clean development install reports advisories only in omitted development too
 - The real operational plan must satisfy the requested beneficiary/objective/KPI/initiative/budget evidence gates.
 - One complete related proposal set must be approved/imported and its source traceability verified.
 
-Status: **local validation successful; production inspection, deployment, and live UAT pending**.
+Status: **local validation and GitHub CI successful; production inspection, deployment, and live UAT pending**.
