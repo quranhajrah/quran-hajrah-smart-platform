@@ -75,6 +75,12 @@ Enterprise 25 adds the non-destructive migration `20260727_enterprise_25_institu
 
 After the application is healthy and ready, run `npm run knowledge:index` once in an authorized production job or Hostinger scheduler using the same environment and persistent `DOCUMENT_STORAGE_ROOT`. The command backfills current uploaded document versions and exits non-zero if any document fails. New uploads are queued automatically. Verify `/health`, `/ready`, login, `/knowledge-intelligence`, an Arabic search, a sourced answer, and that confidential results are hidden from a viewer account.
 
+## Enterprise 26 Executive AI deployment
+
+Enterprise 26 has no database migration, external provider, new environment variable, or entry-file change. Deploy with the established `npm run build:production` build and `apps/api/dist/server.js` entry. The idempotent seed adds Executive AI permissions and safe leadership/manager defaults without changing user role membership.
+
+After deployment, verify `/health`, `/ready`, and login; then open `/executive-assistant`. Test one sourced question, one Board report, one CEO recommendation, and one official-letter draft with an authorized account. Verify every answered result contains numbered source links and that an unsupported question returns `INSUFFICIENT_EVIDENCE`. Repeat with a restricted account and confirm confidential document evidence is absent. Do not enable an external model or add provider credentials for this release.
+
 The seed adds seven analysis permissions, safe role defaults, deterministic rule identifiers, and the bounded default analysis configuration. It never seeds extracted values.
 
 After deployment, use an authorized account to open a non-sensitive supported document, start analysis explicitly, inspect pages/tables/proposals, approve one evidence-backed proposal, run conflict preview, and confirm import. Open the imported Enterprise 23 record and verify “عرض المصدر”. An image-only PDF must report `OCR_REQUIRED`.

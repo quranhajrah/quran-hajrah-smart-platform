@@ -120,6 +120,7 @@ The test stores are created fresh before every test and exist only in process me
 - No password or token logging is implemented.
 - Central error handling omits stack traces in production.
 - Audit records capture actor, request IP, user agent, entity, and action metadata.
+
 ### Enterprise 25 knowledge permissions
 
 The institutional knowledge layer adds `knowledge.search`, `knowledge.ask`,
@@ -129,3 +130,18 @@ seed behavior. Board and executive leadership receive sourced search/answer
 access; employees and viewers receive search and relation visibility only.
 These permissions never bypass document confidentiality: the API applies the
 document access policy before ranking chunks or returning citations.
+
+### Enterprise 26 Executive AI permissions
+
+Enterprise 26 adds `executive_ai.use`, `executive_ai.reports`,
+`executive_ai.recommendations`, `executive_ai.letters`,
+`executive_ai.configure`, and `executive_ai.audit`. `super_admin` receives all
+through the established seed rule. Board leadership receives the complete set;
+the executive director receives operational use, reports, recommendations,
+letters, and audit; selected managers receive only task-specific capabilities.
+No viewer permission is added and no existing user is assigned a role.
+
+Every endpoint checks an Executive AI permission and the Enterprise 25 retrieval
+layer independently applies document confidentiality. An Executive AI
+permission never grants access to a source document that the user could not
+search directly.

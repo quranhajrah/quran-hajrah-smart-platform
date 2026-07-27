@@ -122,4 +122,12 @@ The default `local-arabic-hybrid-v1` provider uses normalized Arabic terms and c
 
 Indexing never delays `server.listen()`. Uploads create a durable queued index record, existing documents are backfilled by `npm run knowledge:index`, and authorized users can request a rebuild through the API. The Hostinger entry file remains `apps/api/dist/server.js`.
 
+## Enterprise 26 executive reasoning layer
+
+Enterprise 26 is an API module registered after the Enterprise 25 knowledge routes and before the identity routes. It calls the public `InstitutionalKnowledgeService.search` contract through `Enterprise25KnowledgeGateway`; no knowledge ranking, indexing, confidentiality, or search file is changed.
+
+The request path is: strict validated Arabic task → intent and subquery plan → existing confidentiality-aware retrieval → independent evidence reranking → local evidence-bound synthesis → numbered source references → privacy-preserving common audit entry. Broad tasks prefer evidence from distinct documents but explicitly disclose when only one document supports the result. Empty evidence always returns `INSUFFICIENT_EVIDENCE`.
+
+The default provider uses local deterministic templates. It performs no outbound call and introduces no runtime secret. `ExecutiveAiQueryPlanner`, `ExecutiveAiEvidenceRanker`, `ExecutiveAiSynthesisProvider`, and `ExecutiveAiRetrievalGateway` are replaceable boundaries for a separately approved provider. The Node entry point, startup timing, ports, health, readiness, Prisma lifecycle, and Hostinger configuration remain unchanged.
+
 `npm run document-analysis:alerts` is the scheduler-ready command for failed analysis, overdue review, approved-but-not-imported proposals, and unresolved conflicts. It is not scheduled inside the API process.

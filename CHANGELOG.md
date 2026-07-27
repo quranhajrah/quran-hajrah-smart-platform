@@ -4,6 +4,17 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ## Unreleased
 
+## [26.0.0] - 2026-07-27
+
+### Enterprise 26 Executive AI Assistant
+
+- Added an isolated Arabic-first executive reasoning layer above the unchanged Enterprise 25 retrieval service.
+- Added intent-aware query planning, evidence reranking, document-diversity preference, and strict source-bound synthesis.
+- Added sourced executive questions, Board reports, CEO recommendations, and official-letter drafts.
+- Added a hard no-evidence/no-answer rule, source links, confidentiality inheritance, rate limits, and hashed audit metadata.
+- Added Executive AI RBAC defaults, an Arabic RTL administration workspace, tests, and operating documentation.
+- Added no schema migration, external AI service, new secret, or change to the Enterprise 25 search implementation.
+
 ## [25.0.0] - 2026-07-27
 
 ### Enterprise 25 Institutional Knowledge Intelligence

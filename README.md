@@ -2,7 +2,7 @@
 
 Production TypeScript monorepo for the Quran Hajrah Smart Platform. It includes secure identity/RBAC, the Institutional Knowledge Center, the Executive Intelligence Platform, and the Institutional Document Intelligence Engine.
 
-Current release: `25.0.0` — Enterprise 25 Institutional Knowledge Intelligence.
+Current release: `26.0.0` — Enterprise 26 Executive AI Assistant.
 
 ## Structure
 
@@ -120,6 +120,20 @@ npm run knowledge:index
 
 New uploads are durably queued for indexing. Operators can also rebuild the index from the protected administration workspace. See [Enterprise 25 guide](docs/enterprise-25-institutional-knowledge-intelligence.md).
 
+## Executive AI Assistant
+
+Enterprise 26 adds a new, isolated reasoning layer above the unchanged Enterprise 25 retrieval API:
+
+- Arabic-first intent planning for vision, mission, beneficiaries, strategic objectives, and operational risks.
+- Multi-query retrieval followed by executive evidence reranking with document-diversity preference.
+- Evidence-bound answers, Board reports, CEO recommendations, and formal letters.
+- A hard citation invariant: the assistant returns `INSUFFICIENT_EVIDENCE` rather than answering when no authorized source is available.
+- Numbered links to the source document, version, page, and section where available.
+- Strict RBAC, per-user document confidentiality inherited from Enterprise 25, request rate limiting, and privacy-preserving audit metadata.
+- Arabic RTL workspace at `/executive-assistant`.
+
+The default synthesis provider is deterministic and local. It does not call an external LLM, does not add secrets, and does not claim generative capability beyond its implemented evidence-bound templates. Provider interfaces allow a separately approved model later without changing Enterprise 25 search. See [Enterprise 26 guide](docs/enterprise-26-executive-ai-assistant.md).
+
 ## Executive Intelligence Platform
 
 Enterprise 23 makes the Arabic RTL executive dashboard the authenticated landing page and adds:
@@ -177,6 +191,9 @@ npm run document-analysis:alerts
 - [Enterprise 25 institutional knowledge intelligence](docs/enterprise-25-institutional-knowledge-intelligence.md)
 - [Enterprise 25 release notes](docs/release-25.0.0.md)
 - [Enterprise 25 validation report](docs/phase-25-institutional-knowledge-validation-report.md)
+- [Enterprise 26 Executive AI Assistant](docs/enterprise-26-executive-ai-assistant.md)
+- [Enterprise 26 release notes](docs/release-26.0.0.md)
+- [Enterprise 26 validation report](docs/phase-26-executive-ai-validation-report.md)
 - [Review and import guide](docs/enterprise-24-review-and-import.md)
 - [Extraction methodology](docs/extraction-methodology.md)
 - [Source traceability](docs/source-traceability.md)

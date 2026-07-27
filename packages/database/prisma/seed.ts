@@ -66,6 +66,12 @@ const permissions = [
   ['knowledge.index', 'إدارة فهرس المعرفة المؤسسية', 'knowledge'],
   ['knowledge.configure', 'تهيئة طبقة المعرفة المؤسسية', 'knowledge'],
   ['knowledge.audit', 'عرض سجل استخدام المعرفة المؤسسية', 'knowledge'],
+  ['executive_ai.use', 'استخدام المساعد التنفيذي الذكي', 'executive_ai'],
+  ['executive_ai.reports', 'إعداد تقارير مجلس الإدارة الموثقة', 'executive_ai'],
+  ['executive_ai.recommendations', 'إعداد توصيات الرئيس التنفيذي', 'executive_ai'],
+  ['executive_ai.letters', 'صياغة الخطابات الرسمية الموثقة', 'executive_ai'],
+  ['executive_ai.configure', 'تهيئة طبقة الاستدلال التنفيذي', 'executive_ai'],
+  ['executive_ai.audit', 'عرض سجل استخدام المساعد التنفيذي', 'executive_ai'],
 ] as const;
 
 const categories = [
@@ -282,6 +288,33 @@ const knowledgePermissionsByRole: Record<string, string[]> = {
   viewer: ['knowledge.search', 'knowledge.relations.view'],
 };
 
+const executiveAiPermissionsByRole: Record<string, string[]> = {
+  board_chair: [
+    'executive_ai.use',
+    'executive_ai.reports',
+    'executive_ai.recommendations',
+    'executive_ai.letters',
+    'executive_ai.configure',
+    'executive_ai.audit',
+  ],
+  executive_director: [
+    'executive_ai.use',
+    'executive_ai.reports',
+    'executive_ai.recommendations',
+    'executive_ai.letters',
+    'executive_ai.audit',
+  ],
+  operations_manager: ['executive_ai.use', 'executive_ai.reports', 'executive_ai.recommendations'],
+  finance_manager: ['executive_ai.use', 'executive_ai.reports'],
+  education_manager: ['executive_ai.use'],
+  governance_officer: [
+    'executive_ai.use',
+    'executive_ai.reports',
+    'executive_ai.letters',
+    'executive_ai.audit',
+  ],
+};
+
 const documentAnalysisRuleIds = [
   'section.objective.v1',
   'section.kpi.v1',
@@ -406,9 +439,7 @@ async function main() {
     });
   }
 
-  for (const [roleName, permissionCodes] of Object.entries(
-    documentAnalysisPermissionsByRole,
-  )) {
+  for (const [roleName, permissionCodes] of Object.entries(documentAnalysisPermissionsByRole)) {
     const role = await prisma.role.findUniqueOrThrow({ where: { name: roleName } });
     const rolePermissions = await prisma.permission.findMany({
       where: { code: { in: permissionCodes } },
@@ -421,6 +452,18 @@ async function main() {
   }
 
   for (const [roleName, permissionCodes] of Object.entries(knowledgePermissionsByRole)) {
+    const role = await prisma.role.findUniqueOrThrow({ where: { name: roleName } });
+    const rolePermissions = await prisma.permission.findMany({
+      where: { code: { in: permissionCodes } },
+      select: { id: true },
+    });
+    await prisma.rolePermission.createMany({
+      data: rolePermissions.map(({ id }) => ({ roleId: role.id, permissionId: id })),
+      skipDuplicates: true,
+    });
+  }
+
+  for (const [roleName, permissionCodes] of Object.entries(executiveAiPermissionsByRole)) {
     const role = await prisma.role.findUniqueOrThrow({ where: { name: roleName } });
     const rolePermissions = await prisma.permission.findMany({
       where: { code: { in: permissionCodes } },

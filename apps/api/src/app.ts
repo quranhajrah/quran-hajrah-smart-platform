@@ -30,6 +30,12 @@ import { PrismaKnowledgeStore } from './knowledge/prisma-store.js';
 import type { KnowledgeStore } from './knowledge/store.js';
 import { InstitutionalKnowledgeService } from './knowledge/service.js';
 import { createKnowledgeRouter } from './knowledge/routes.js';
+import { createExecutiveAiRouter } from './executive-ai/routes.js';
+import {
+  Enterprise25KnowledgeGateway,
+  ExecutiveAiReasoningService,
+  IdentityAuditSink,
+} from './executive-ai/service.js';
 
 export type AppDependencies = {
   store?: IdentityStore;
@@ -41,6 +47,7 @@ export type AppDependencies = {
   executiveStore?: ExecutiveStore;
   analysisStore?: AnalysisStore;
   knowledgeStore?: KnowledgeStore;
+  executiveAiService?: ExecutiveAiReasoningService;
 };
 
 export type ReadinessChecks = {
@@ -86,6 +93,12 @@ export const createApp = (dependencies: AppDependencies = {}) => {
     store,
     config.documentMaxFileSizeBytes,
   );
+  const executiveAiService =
+    dependencies.executiveAiService ??
+    new ExecutiveAiReasoningService(
+      new Enterprise25KnowledgeGateway(knowledgeService),
+      new IdentityAuditSink(store),
+    );
   const queueKnowledgeIndex =
     config.nodeEnv === 'test' && !dependencies.knowledgeStore
       ? undefined
@@ -181,16 +194,7 @@ export const createApp = (dependencies: AppDependencies = {}) => {
     return response.json({ status: 'ready', checks });
   });
 
-  app.use(
-    '/api',
-    createDocumentRouter(
-      store,
-      documentStore,
-      storage,
-      config,
-      queueKnowledgeIndex,
-    ),
-  );
+  app.use('/api', createDocumentRouter(store, documentStore, storage, config, queueKnowledgeIndex));
   app.use(
     '/api',
     createDocumentAnalysisRouter(store, documentStore, analysisStore, storage, config, logger),
@@ -200,6 +204,7 @@ export const createApp = (dependencies: AppDependencies = {}) => {
     createExecutiveRouter(store, documentStore, executiveStore, config, executiveAnalysisStore),
   );
   app.use('/api', createKnowledgeRouter(store, knowledgeService, config));
+  app.use('/api', createExecutiveAiRouter(store, executiveAiService, config));
   app.use('/api', createIdentityRouter(store, config));
   app.use('/api', (_request, _response, next) =>
     next(new AppError(404, 'API route not found.', 'NOT_FOUND')),
