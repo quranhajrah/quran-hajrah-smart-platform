@@ -2,7 +2,7 @@
 
 Production TypeScript monorepo for the Quran Hajrah Smart Platform. It includes secure identity/RBAC, the Institutional Knowledge Center, the Executive Intelligence Platform, and the Institutional Document Intelligence Engine.
 
-Current release: `24.2.1` — Enterprise 24.2.1 Analysis Identity and Strategic Reconstruction.
+Current release: `25.0.0` — Enterprise 25 Institutional Knowledge Intelligence.
 
 ## Structure
 
@@ -99,6 +99,27 @@ Enterprise 22 provides the first production business module at `/documents` in a
 
 Production operators must set `DOCUMENT_STORAGE_ROOT` to a persistent, non-public Hostinger directory and include that directory in encrypted backups. `DOCUMENT_MAX_FILE_SIZE_MB` defaults to 25.
 
+## Institutional Knowledge Intelligence
+
+Enterprise 25 adds a knowledge layer above the existing Knowledge Center without changing the frozen Enterprise 24.2.1 extraction engine:
+
+- Versioned indexing of every current uploaded document version, using existing extracted pages when available and the same protected storage provider otherwise.
+- Arabic-aware local feature embeddings combined with lexical overlap for hybrid ranking. The provider contract can later be replaced by an approved vector service without changing API consumers.
+- Cross-document topic relationships derived only from shared evidence terms.
+- Confidentiality-aware search under `/api/knowledge/search`.
+- Extractive, evidence-bound answers under `/api/knowledge/answer`; every answer item includes a numbered document reference and page when available.
+- An Arabic RTL workspace at `/knowledge-intelligence`.
+
+This release does not call an LLM, paid AI service, OCR service, or external embedding API. Its “semantic” search is a deterministic local Arabic-aware vector/lexical implementation, and its answers quote or summarize retrieved evidence rather than inventing facts.
+
+After the migration and seed have completed, backfill all existing uploaded documents:
+
+```bash
+npm run knowledge:index
+```
+
+New uploads are durably queued for indexing. Operators can also rebuild the index from the protected administration workspace. See [Enterprise 25 guide](docs/enterprise-25-institutional-knowledge-intelligence.md).
+
 ## Executive Intelligence Platform
 
 Enterprise 23 makes the Arabic RTL executive dashboard the authenticated landing page and adds:
@@ -153,6 +174,9 @@ npm run document-analysis:alerts
 - [Enterprise 24.2 validation report](docs/phase-24-2-validation-report.md)
 - [Enterprise 24.2.1 identity and strategic reconstruction](docs/enterprise-24-2-1-analysis-identity.md)
 - [Enterprise 24.2.1 validation report](docs/phase-24-2-1-validation-report.md)
+- [Enterprise 25 institutional knowledge intelligence](docs/enterprise-25-institutional-knowledge-intelligence.md)
+- [Enterprise 25 release notes](docs/release-25.0.0.md)
+- [Enterprise 25 validation report](docs/phase-25-institutional-knowledge-validation-report.md)
 - [Review and import guide](docs/enterprise-24-review-and-import.md)
 - [Extraction methodology](docs/extraction-methodology.md)
 - [Source traceability](docs/source-traceability.md)

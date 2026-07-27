@@ -26,6 +26,10 @@ import type { ExecutiveStore } from './executive/store.js';
 import { PrismaAnalysisStore } from './analysis/prisma-store.js';
 import { createDocumentAnalysisRouter } from './analysis/routes.js';
 import type { AnalysisStore } from './analysis/store.js';
+import { PrismaKnowledgeStore } from './knowledge/prisma-store.js';
+import type { KnowledgeStore } from './knowledge/store.js';
+import { InstitutionalKnowledgeService } from './knowledge/service.js';
+import { createKnowledgeRouter } from './knowledge/routes.js';
 
 export type AppDependencies = {
   store?: IdentityStore;
@@ -36,6 +40,7 @@ export type AppDependencies = {
   storage?: StorageProvider;
   executiveStore?: ExecutiveStore;
   analysisStore?: AnalysisStore;
+  knowledgeStore?: KnowledgeStore;
 };
 
 export type ReadinessChecks = {
@@ -73,6 +78,20 @@ export const createApp = (dependencies: AppDependencies = {}) => {
   const storage = dependencies.storage ?? new LocalStorageProvider(config.documentStorageRoot);
   const executiveStore = dependencies.executiveStore ?? new PrismaExecutiveStore();
   const analysisStore = dependencies.analysisStore ?? new PrismaAnalysisStore();
+  const knowledgeStore = dependencies.knowledgeStore ?? new PrismaKnowledgeStore();
+  const knowledgeService = new InstitutionalKnowledgeService(
+    knowledgeStore,
+    documentStore,
+    storage,
+    store,
+    config.documentMaxFileSizeBytes,
+  );
+  const queueKnowledgeIndex =
+    config.nodeEnv === 'test' && !dependencies.knowledgeStore
+      ? undefined
+      : async (documentId: string, documentVersionId: string) => {
+          await knowledgeService.queueUploadedVersion(documentId, documentVersionId);
+        };
   const executiveAnalysisStore =
     dependencies.analysisStore ?? (config.nodeEnv === 'test' ? undefined : analysisStore);
   const app = express();
@@ -162,7 +181,16 @@ export const createApp = (dependencies: AppDependencies = {}) => {
     return response.json({ status: 'ready', checks });
   });
 
-  app.use('/api', createDocumentRouter(store, documentStore, storage, config));
+  app.use(
+    '/api',
+    createDocumentRouter(
+      store,
+      documentStore,
+      storage,
+      config,
+      queueKnowledgeIndex,
+    ),
+  );
   app.use(
     '/api',
     createDocumentAnalysisRouter(store, documentStore, analysisStore, storage, config, logger),
@@ -171,6 +199,7 @@ export const createApp = (dependencies: AppDependencies = {}) => {
     '/api',
     createExecutiveRouter(store, documentStore, executiveStore, config, executiveAnalysisStore),
   );
+  app.use('/api', createKnowledgeRouter(store, knowledgeService, config));
   app.use('/api', createIdentityRouter(store, config));
   app.use('/api', (_request, _response, next) =>
     next(new AppError(404, 'API route not found.', 'NOT_FOUND')),

@@ -14,6 +14,7 @@ import {
 } from './Executive';
 import { entityDefinitions } from './executive-config';
 import { DocumentAnalysisCenter, DocumentAnalysisReview } from './DocumentAnalysis';
+import { KnowledgeIntelligence } from './KnowledgeIntelligence';
 
 function Guard({ children, permission }: { children: ReactNode; permission?: string }) {
   const { user, loading, can } = useAuth();
@@ -90,6 +91,9 @@ function Layout({ children }: { children: ReactNode }) {
           {can('alerts.view') && <NavLink to="/executive/alerts">التنبيهات</NavLink>}
           {can('reports.view') && <NavLink to="/executive/reports">التقارير التنفيذية</NavLink>}
           {can('documents.view') && <NavLink to="/documents">مركز المعرفة</NavLink>}
+          {can('knowledge.search') && (
+            <NavLink to="/knowledge-intelligence">الذكاء المعرفي</NavLink>
+          )}
           {can('document_analysis.view') && (
             <NavLink to="/document-analysis">تحليل المستندات</NavLink>
           )}
@@ -424,6 +428,14 @@ export default function App() {
             element={
               <ProtectedPage permission="document_analysis.view">
                 <DocumentAnalysisCenter />
+              </ProtectedPage>
+            }
+          />
+          <Route
+            path="/knowledge-intelligence"
+            element={
+              <ProtectedPage permission="knowledge.search">
+                <KnowledgeIntelligence />
               </ProtectedPage>
             }
           />

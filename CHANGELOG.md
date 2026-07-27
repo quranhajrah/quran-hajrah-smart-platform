@@ -4,6 +4,18 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ## Unreleased
 
+## [25.0.0] - 2026-07-27
+
+### Enterprise 25 Institutional Knowledge Intelligence
+
+- Added a versioned institutional knowledge index for document versions, evidence-preserving chunks, cross-document relationships, safe query telemetry, and configurable local indexing.
+- Added Arabic-aware local feature embeddings and hybrid semantic/lexical ranking behind replaceable provider interfaces, without external AI calls or new secrets.
+- Added confidentiality-aware search and extractive institutional answers in which every returned statement is tied to a document, version, page where available, and source link.
+- Added durable upload-time indexing queues, explicit document and full-corpus indexing APIs, and the production `npm run knowledge:index` backfill command.
+- Added an Arabic RTL Knowledge Intelligence workspace with index health, semantic search, sourced answers, and explicit capability limitations.
+- Added knowledge RBAC defaults, additive migration `20260727_enterprise_25_institutional_knowledge`, migration safety tests, ranking/chunking/citation tests, and deployment guidance.
+- Kept the Enterprise 24.2.1 document extraction engine frozen and unchanged.
+
 ## [24.2.1] - 2026-07-27
 
 ### Enterprise 24.2.1 Analysis Identity and Strategic Reconstruction

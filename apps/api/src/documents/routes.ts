@@ -109,10 +109,16 @@ export const createDocumentRouter = (
   documentStore: DocumentStore,
   storage: StorageProvider,
   config: AppConfig,
+  onVersionUploaded?: (documentId: string, documentVersionId: string) => Promise<void>,
 ) => {
   const router = Router();
   const authenticated = requireAuth(identityStore, config);
-  const service = new DocumentService(documentStore, storage, config.documentMaxFileSizeBytes);
+  const service = new DocumentService(
+    documentStore,
+    storage,
+    config.documentMaxFileSizeBytes,
+    onVersionUploaded,
+  );
   const uploadBody = express.raw({
     type: () => true,
     limit: config.documentMaxFileSizeBytes,

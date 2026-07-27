@@ -38,3 +38,12 @@ Database and document storage must use coordinated recovery timestamps. Store ba
 7. Document results in protected operational storage.
 
 Never reset, truncate, delete, run `prisma migrate dev`, or use `prisma db push` against production or a sole recovery copy. Roll forward where possible. A destructive recovery requires explicit incident authority and a verified restorable backup.
+### Enterprise 25 knowledge index
+
+`KnowledgeDocumentIndex`, `KnowledgeChunk`, `KnowledgeDocumentRelation`,
+`KnowledgeQueryLog`, and `KnowledgeIndexConfiguration` are included in normal
+PostgreSQL backups. The index is derived data and can be rebuilt with
+`npm run knowledge:index` after document binaries and the primary database have
+been restored. Always restore the protected `DOCUMENT_STORAGE_ROOT` before
+rebuilding. Query telemetry contains hashes rather than raw questions, but it
+must still follow the database retention policy.

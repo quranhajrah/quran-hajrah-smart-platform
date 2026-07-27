@@ -120,3 +120,12 @@ The test stores are created fresh before every test and exist only in process me
 - No password or token logging is implemented.
 - Central error handling omits stack traces in production.
 - Audit records capture actor, request IP, user agent, entity, and action metadata.
+### Enterprise 25 knowledge permissions
+
+The institutional knowledge layer adds `knowledge.search`, `knowledge.ask`,
+`knowledge.relations.view`, `knowledge.index`, `knowledge.configure`, and
+`knowledge.audit`. `super_admin` receives all permissions through the existing
+seed behavior. Board and executive leadership receive sourced search/answer
+access; employees and viewers receive search and relation visibility only.
+These permissions never bypass document confidentiality: the API applies the
+document access policy before ranking chunks or returning citations.

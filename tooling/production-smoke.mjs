@@ -93,6 +93,11 @@ try {
   if (documentAnalysis.status !== 200 || !documentAnalysisHtml.includes('id="root"')) {
     throw new Error('Enterprise 24 review center SPA fallback failed.');
   }
+  const knowledgeIntelligence = await fetch(`http://127.0.0.1:${port}/knowledge-intelligence`);
+  const knowledgeIntelligenceHtml = await knowledgeIntelligence.text();
+  if (knowledgeIntelligence.status !== 200 || !knowledgeIntelligenceHtml.includes('id="root"')) {
+    throw new Error('Enterprise 25 knowledge intelligence SPA fallback failed.');
+  }
 
   const portal = await fetch(`http://127.0.0.1:${port}/portal/`, { redirect: 'manual' });
   const portalHtml = await portal.text();
@@ -123,6 +128,10 @@ try {
   );
   if (protectedDocumentAnalysis.status !== 401) {
     throw new Error('Document Intelligence API did not reject anonymous access.');
+  }
+  const protectedKnowledge = await fetch(`http://127.0.0.1:${port}/api/knowledge/summary`);
+  if (protectedKnowledge.status !== 401) {
+    throw new Error('Institutional Knowledge Intelligence API did not reject anonymous access.');
   }
 
   const missingApi = await fetch(`http://127.0.0.1:${port}/api/not-a-route`);
@@ -161,7 +170,7 @@ try {
   }
 
   console.log(
-    'Production runtime, logs, health, readiness, SPAs, Knowledge Center, Executive Intelligence, Document Intelligence, static assets, and protected routes passed.',
+    'Production runtime, logs, health, readiness, SPAs, Knowledge Center, Executive Intelligence, Document Intelligence, Institutional Knowledge Intelligence, static assets, and protected routes passed.',
   );
 } finally {
   child.kill('SIGTERM');

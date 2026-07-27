@@ -27,6 +27,7 @@ export class DocumentService {
     private readonly store: DocumentStore,
     private readonly storage: StorageProvider,
     private readonly maximumFileSize: number,
+    private readonly onVersionUploaded?: (documentId: string, documentVersionId: string) => Promise<void>,
   ) {}
 
   listCategories() {
@@ -172,6 +173,20 @@ export class DocumentService {
         },
         ...context,
       });
+      if (this.onVersionUploaded) {
+        try {
+          await this.onVersionUploaded(document.id, result.version.id);
+        } catch (error) {
+          console.error(
+            JSON.stringify({
+              event: 'knowledge_index_queue_failed',
+              documentId: document.id,
+              documentVersionId: result.version.id,
+              errorName: error instanceof Error ? error.name : 'UnknownError',
+            }),
+          );
+        }
+      }
       return result;
     } catch (error) {
       await this.storage.delete(stored.path);

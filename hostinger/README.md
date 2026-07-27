@@ -69,6 +69,12 @@ Enterprise 24.2 adds no migration and changes no Hostinger setting. Deploy with 
 
 Enterprise 24.2.1 also adds no migration or environment variable. After deployment, use **إعادة التحليل** from the document page, verify that the review URL has a new job ID and that the review summary reports extraction version `24.2.1`, then re-run the strategic-plan and operational-plan UAT checklist. **إعادة المحاولة** intentionally retains the existing job ID and is not a substitute for release-version acceptance.
 
+## Enterprise 25 knowledge-index deployment
+
+Enterprise 25 adds the non-destructive migration `20260727_enterprise_25_institutional_knowledge`. Keep the entry file `apps/api/dist/server.js`; no new secret or environment variable is required. The normal `postbuild:production` lifecycle applies the migration and seeds knowledge permissions and the default local index configuration.
+
+After the application is healthy and ready, run `npm run knowledge:index` once in an authorized production job or Hostinger scheduler using the same environment and persistent `DOCUMENT_STORAGE_ROOT`. The command backfills current uploaded document versions and exits non-zero if any document fails. New uploads are queued automatically. Verify `/health`, `/ready`, login, `/knowledge-intelligence`, an Arabic search, a sourced answer, and that confidential results are hidden from a viewer account.
+
 The seed adds seven analysis permissions, safe role defaults, deterministic rule identifiers, and the bounded default analysis configuration. It never seeds extracted values.
 
 After deployment, use an authorized account to open a non-sensitive supported document, start analysis explicitly, inspect pages/tables/proposals, approve one evidence-backed proposal, run conflict preview, and confirm import. Open the imported Enterprise 23 record and verify “عرض المصدر”. An image-only PDF must report `OCR_REQUIRED`.

@@ -60,6 +60,12 @@ const permissions = [
   ['document_analysis.import', 'استيراد المقترحات المعتمدة', 'document_analysis'],
   ['document_analysis.configure', 'تهيئة محرك تحليل المستندات', 'document_analysis'],
   ['document_analysis.audit', 'عرض سجل تدقيق تحليل المستندات', 'document_analysis'],
+  ['knowledge.search', 'البحث في المعرفة المؤسسية', 'knowledge'],
+  ['knowledge.ask', 'طرح الأسئلة على المعرفة المؤسسية', 'knowledge'],
+  ['knowledge.relations.view', 'عرض علاقات المستندات', 'knowledge'],
+  ['knowledge.index', 'إدارة فهرس المعرفة المؤسسية', 'knowledge'],
+  ['knowledge.configure', 'تهيئة طبقة المعرفة المؤسسية', 'knowledge'],
+  ['knowledge.audit', 'عرض سجل استخدام المعرفة المؤسسية', 'knowledge'],
 ] as const;
 
 const categories = [
@@ -241,6 +247,41 @@ const documentAnalysisPermissionsByRole: Record<string, string[]> = {
   viewer: ['document_analysis.view'],
 };
 
+const knowledgePermissionsByRole: Record<string, string[]> = {
+  board_chair: [
+    'knowledge.search',
+    'knowledge.ask',
+    'knowledge.relations.view',
+    'knowledge.index',
+    'knowledge.configure',
+    'knowledge.audit',
+  ],
+  executive_director: [
+    'knowledge.search',
+    'knowledge.ask',
+    'knowledge.relations.view',
+    'knowledge.index',
+    'knowledge.audit',
+  ],
+  operations_manager: [
+    'knowledge.search',
+    'knowledge.ask',
+    'knowledge.relations.view',
+    'knowledge.index',
+  ],
+  finance_manager: ['knowledge.search', 'knowledge.ask', 'knowledge.relations.view'],
+  education_manager: ['knowledge.search', 'knowledge.ask', 'knowledge.relations.view'],
+  governance_officer: [
+    'knowledge.search',
+    'knowledge.ask',
+    'knowledge.relations.view',
+    'knowledge.index',
+    'knowledge.audit',
+  ],
+  employee: ['knowledge.search', 'knowledge.relations.view'],
+  viewer: ['knowledge.search', 'knowledge.relations.view'],
+};
+
 const documentAnalysisRuleIds = [
   'section.objective.v1',
   'section.kpi.v1',
@@ -379,6 +420,18 @@ async function main() {
     });
   }
 
+  for (const [roleName, permissionCodes] of Object.entries(knowledgePermissionsByRole)) {
+    const role = await prisma.role.findUniqueOrThrow({ where: { name: roleName } });
+    const rolePermissions = await prisma.permission.findMany({
+      where: { code: { in: permissionCodes } },
+      select: { id: true },
+    });
+    await prisma.rolePermission.createMany({
+      data: rolePermissions.map(({ id }) => ({ roleId: role.id, permissionId: id })),
+      skipDuplicates: true,
+    });
+  }
+
   for (const [key, nameAr, dataType, frequency, unit] of metricDefinitions) {
     const higherIsBetter = !['delayed_initiatives', 'open_risks', 'critical_risks'].includes(key);
     await prisma.institutionalMetric.upsert({
@@ -483,6 +536,31 @@ async function main() {
     },
   });
 
+  await prisma.knowledgeIndexConfiguration.upsert({
+    where: { key: 'institutional-default' },
+    update: {
+      indexVersion: '25.0.0',
+      embeddingProvider: 'local-arabic-hybrid-v1',
+      embeddingDimensions: 384,
+      chunkSize: 220,
+      chunkOverlap: 40,
+      minimumScore: 0.2,
+      maxResults: 8,
+      isActive: true,
+    },
+    create: {
+      key: 'institutional-default',
+      indexVersion: '25.0.0',
+      embeddingProvider: 'local-arabic-hybrid-v1',
+      embeddingDimensions: 384,
+      chunkSize: 220,
+      chunkOverlap: 40,
+      minimumScore: 0.2,
+      maxResults: 8,
+      isActive: true,
+    },
+  });
+
   const viewer = await prisma.role.findUniqueOrThrow({ where: { name: 'viewer' } });
   const dashboardPermission = await prisma.permission.findUniqueOrThrow({
     where: { code: 'dashboard.view' },
@@ -497,7 +575,7 @@ async function main() {
 main()
   .then(() =>
     console.log(
-      'Identity, document, executive, and document-analysis permissions and safe defaults seeded.',
+      'Identity, document, executive, analysis, and institutional knowledge defaults seeded.',
     ),
   )
   .finally(() => prisma.$disconnect());

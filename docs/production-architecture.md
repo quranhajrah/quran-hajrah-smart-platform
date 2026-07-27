@@ -112,4 +112,14 @@ Enterprise 24.2 adds an in-memory logical record assembler before those rules. I
 
 Enterprise 24.2.1 gives every analysis job an application-owned semantic extraction version independent of its parser/provider version. That semantic version participates in the job fingerprint; unforced requests cannot reuse older-rule results, and forced reanalysis creates a new fingerprint and job ID. Provider versions remain diagnostic metadata. Strategic-plan axis reconstruction now uses the same evidence-preserving logical assembly and proposal quality gates. No schema, migration, environment variable, or Hostinger entry-file change is required.
 
+## Enterprise 25 institutional knowledge layer
+
+Enterprise 25 adds an independent `knowledge` module inside the existing Express process. It does not modify or invoke Enterprise 24 business rules. The layer indexes current document versions from persisted analysis text when present; otherwise it reads the binary through the same `StorageProvider` used by download and performs bounded text parsing through the existing provider contract. Unsupported or text-poor files receive a metadata-only partial index rather than fabricated content.
+
+PostgreSQL stores versioned index records, bounded evidence chunks, local feature vectors, cross-document topic relationships, configuration, and query telemetry. Raw questions are not retained in telemetry; only a SHA-256 query hash, result count, status, and latency are stored. Search candidates are filtered by the current document confidentiality and access-rule policy before ranking.
+
+The default `local-arabic-hybrid-v1` provider uses normalized Arabic terms and character features plus lexical overlap. It makes no network call. `KnowledgeEmbeddingProvider`, `KnowledgeAnswerComposer`, and `ExecutiveKnowledgeAssistant` keep the architecture replaceable for a future approved Executive AI provider. Answers are extractive and must carry numbered source references. Insufficient evidence produces no synthetic answer.
+
+Indexing never delays `server.listen()`. Uploads create a durable queued index record, existing documents are backfilled by `npm run knowledge:index`, and authorized users can request a rebuild through the API. The Hostinger entry file remains `apps/api/dist/server.js`.
+
 `npm run document-analysis:alerts` is the scheduler-ready command for failed analysis, overdue review, approved-but-not-imported proposals, and unresolved conflicts. It is not scheduled inside the API process.

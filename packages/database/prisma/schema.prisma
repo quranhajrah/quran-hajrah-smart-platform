@@ -83,6 +83,7 @@ model User {
   budgetRecordsUpdated          BudgetRecord[]                  @relation("BudgetRecordUpdatedBy")
   budgetLinesCreated            BudgetLine[]                    @relation("BudgetLineCreatedBy")
   budgetLinesUpdated            BudgetLine[]                    @relation("BudgetLineUpdatedBy")
+  knowledgeQueries              KnowledgeQueryLog[]
 
   @@index([isActive])
   @@index([createdAt])
@@ -286,6 +287,9 @@ model Document {
   analysisPages        DocumentPage[]
   extractionProposals  ExtractionProposal[]
   sourceEvidence       SourceEvidenceReference[]
+  knowledgeIndexes     KnowledgeDocumentIndex[]
+  knowledgeRelationsFrom KnowledgeDocumentRelation[] @relation("KnowledgeRelationSourceDocument")
+  knowledgeRelationsTo   KnowledgeDocumentRelation[] @relation("KnowledgeRelationTargetDocument")
 
   @@index([categoryId, status])
   @@index([documentType, status])
@@ -318,6 +322,9 @@ model DocumentVersion {
   analysisJobs        DocumentAnalysisJob[]
   extractionProposals ExtractionProposal[]
   sourceEvidence      SourceEvidenceReference[]
+  knowledgeIndexes    KnowledgeDocumentIndex[]
+  knowledgeRelationsFrom KnowledgeDocumentRelation[] @relation("KnowledgeRelationSourceVersion")
+  knowledgeRelationsTo   KnowledgeDocumentRelation[] @relation("KnowledgeRelationTargetVersion")
 
   @@unique([documentId, versionNumber])
   @@index([documentId, createdAt])
@@ -1377,4 +1384,133 @@ model BudgetLine {
   @@index([department])
   @@index([createdById])
   @@index([updatedById])
+}
+
+enum KnowledgeIndexStatus {
+  QUEUED
+  PROCESSING
+  INDEXED
+  PARTIAL
+  FAILED
+  UNSUPPORTED
+}
+
+enum KnowledgeSourceKind {
+  DOCUMENT_CONTENT
+  DOCUMENT_METADATA
+  ANALYSIS_TEXT
+}
+
+enum KnowledgeRelationType {
+  SHARES_TOPIC
+  REFERENCES
+  SUPERSEDES
+  RELATED
+}
+
+enum KnowledgeAnswerStatus {
+  ANSWERED
+  INSUFFICIENT_EVIDENCE
+}
+
+model KnowledgeDocumentIndex {
+  id                  String               @id @default(uuid()) @db.Uuid
+  documentId          String               @db.Uuid
+  documentVersionId   String               @db.Uuid
+  status              KnowledgeIndexStatus @default(QUEUED)
+  sourceKind          KnowledgeSourceKind  @default(DOCUMENT_METADATA)
+  indexVersion        String
+  embeddingProvider   String
+  embeddingDimensions Int
+  contentHash         String?
+  chunkCount          Int                  @default(0)
+  isCurrent           Boolean              @default(false)
+  indexedAt           DateTime?
+  failureReason       String?
+  providerMetadata    Json?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  document            Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentVersion     DocumentVersion      @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  chunks              KnowledgeChunk[]
+
+  @@unique([documentVersionId, indexVersion])
+  @@index([documentId, isCurrent, status])
+  @@index([status, createdAt])
+  @@index([indexedAt])
+}
+
+model KnowledgeChunk {
+  id                String                 @id @default(uuid()) @db.Uuid
+  indexId           String                 @db.Uuid
+  documentId        String                 @db.Uuid
+  documentVersionId String                 @db.Uuid
+  sequence          Int
+  pageNumber        Int?
+  section           String?
+  content           String
+  contentHash       String
+  terms             String[]               @default([])
+  embedding         Float[]
+  tokenCount        Int
+  createdAt         DateTime               @default(now())
+  index             KnowledgeDocumentIndex @relation(fields: [indexId], references: [id], onDelete: Cascade)
+
+  @@unique([indexId, sequence])
+  @@index([documentId, documentVersionId])
+  @@index([documentVersionId, pageNumber])
+  @@index([contentHash])
+}
+
+model KnowledgeDocumentRelation {
+  id                String                @id @default(uuid()) @db.Uuid
+  sourceDocumentId  String                @db.Uuid
+  targetDocumentId  String                @db.Uuid
+  sourceVersionId   String                @db.Uuid
+  targetVersionId   String                @db.Uuid
+  relationType      KnowledgeRelationType
+  score             Decimal               @db.Decimal(5, 4)
+  sharedTerms       String[]               @default([])
+  rationale         String?
+  discoveredBy      String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  sourceDocument    Document              @relation("KnowledgeRelationSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  targetDocument    Document              @relation("KnowledgeRelationTargetDocument", fields: [targetDocumentId], references: [id], onDelete: Cascade)
+  sourceVersion     DocumentVersion       @relation("KnowledgeRelationSourceVersion", fields: [sourceVersionId], references: [id], onDelete: Cascade)
+  targetVersion     DocumentVersion       @relation("KnowledgeRelationTargetVersion", fields: [targetVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceVersionId, targetVersionId, relationType])
+  @@index([sourceDocumentId, score])
+  @@index([targetDocumentId, score])
+  @@index([relationType, score])
+}
+
+model KnowledgeQueryLog {
+  id          String                @id @default(uuid()) @db.Uuid
+  userId      String?               @db.Uuid
+  queryHash   String
+  resultCount Int
+  answerStatus KnowledgeAnswerStatus
+  latencyMs   Int
+  createdAt   DateTime              @default(now())
+  user        User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([answerStatus, createdAt])
+  @@index([queryHash])
+}
+
+model KnowledgeIndexConfiguration {
+  key                 String   @id
+  indexVersion        String
+  embeddingProvider   String
+  embeddingDimensions Int
+  chunkSize           Int
+  chunkOverlap        Int
+  minimumScore        Float
+  maxResults          Int
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }

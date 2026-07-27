@@ -1681,3 +1681,124 @@ td small {
     flex: 1;
   }
 }
+
+.knowledge-ai-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+  padding: 1.4rem;
+  color: #fff;
+  border-radius: 18px;
+  background: linear-gradient(125deg, #0d5139, #1f7652);
+}
+.knowledge-ai-hero h1 {
+  margin: 0.2rem 0;
+}
+.knowledge-ai-hero p {
+  margin: 0;
+  color: #e5f2ec;
+}
+.knowledge-ai-hero .eyebrow {
+  color: #e4c272;
+  font-weight: 800;
+}
+.knowledge-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+.knowledge-summary-grid article {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1rem;
+  border: 1px solid #dbe8e1;
+  border-radius: 14px;
+  background: #fff;
+}
+.knowledge-summary-grid strong {
+  color: #155f43;
+  font-size: 1.6rem;
+}
+.knowledge-summary-grid span {
+  color: #667a72;
+}
+.knowledge-summary-grid .warning {
+  border-color: #d8a43d;
+  background: #fffaf0;
+}
+.knowledge-query-card {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  padding: 1.2rem;
+  border: 1px solid #dbe8e1;
+  border-radius: 16px;
+  background: #fff;
+}
+.knowledge-query-card > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.65rem;
+}
+.knowledge-query-card label {
+  font-weight: 800;
+}
+.knowledge-query-card small,
+.knowledge-limitations {
+  color: #64776f;
+}
+.knowledge-query-card .gold {
+  color: #2c2a20;
+  background: #d8b35a;
+}
+.knowledge-answer,
+.knowledge-results article {
+  margin-bottom: 0.8rem;
+}
+.answer-body {
+  line-height: 2;
+  white-space: pre-line;
+}
+.knowledge-sources {
+  display: grid;
+  gap: 0.55rem;
+  padding-right: 1.5rem;
+}
+.knowledge-sources li {
+  padding: 0.55rem;
+  border-radius: 9px;
+  background: #f3f8f5;
+}
+.knowledge-sources span {
+  display: block;
+  color: #65786f;
+  font-size: 0.84rem;
+}
+.knowledge-results {
+  display: grid;
+  gap: 0.7rem;
+}
+.knowledge-results article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.knowledge-results article > div > a {
+  color: #155f43;
+  font-weight: 800;
+}
+.knowledge-results article > div > span {
+  color: #9a6e12;
+  font-weight: 700;
+}
+@media (max-width: 900px) {
+  .knowledge-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .knowledge-query-card > div {
+    grid-template-columns: 1fr;
+  }
+}
