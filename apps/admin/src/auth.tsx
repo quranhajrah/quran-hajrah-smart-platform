@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api, setAccessToken, type AuthPayload, type User } from './api';
+import { clearExecutiveDashboardCache } from './executive-dashboard-data';
 
 type AuthValue = {
   user: User | null;
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const applyAuth = useCallback((payload: AuthPayload | null) => {
+    clearExecutiveDashboardCache();
     setAccessToken(payload?.accessToken ?? null);
     setUser(payload?.user ?? null);
     setPermissions(payload?.permissions ?? []);

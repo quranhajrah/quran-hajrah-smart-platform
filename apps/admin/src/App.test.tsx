@@ -263,7 +263,7 @@ describe('admin authentication flow', () => {
         return json({
           accessToken: 'test-access-token',
           user: admin,
-          permissions: ['dashboard.view', 'executive.query'],
+          permissions: ['dashboard.view', 'executive.query', 'executive_ai.use'],
         });
       }
       if (url.endsWith('/executive/dashboard')) {
@@ -326,6 +326,6 @@ describe('admin authentication flow', () => {
 
     expect(await screen.findByRole('heading', { name: 'لوحة القيادة التنفيذية' })).toBeTruthy();
     expect(await screen.findByText('مساعد تنفيذي — إصدار البيانات المؤسسية')).toBeTruthy();
-    expect((await screen.findAllByText('لا توجد بيانات')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('لا توجد بيانات معتمدة')).length).toBeGreaterThan(0);
   });
 });

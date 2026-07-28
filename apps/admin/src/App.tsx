@@ -1,12 +1,11 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, NavLink, Route, Routes, useNavigate } from './router';
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from './router';
 import { api, type Role, type User } from './api';
 import { AuthProvider, useAuth } from './auth';
 import { DocumentDetails, DocumentsCenter } from './Documents';
 import {
   AlertsCenter,
   DashboardPreferences,
-  ExecutiveDashboard,
   ExecutiveDetail,
   ExecutiveHealthPage,
   ExecutiveRegistry,
@@ -16,6 +15,8 @@ import { entityDefinitions } from './executive-config';
 import { DocumentAnalysisCenter, DocumentAnalysisReview } from './DocumentAnalysis';
 import { KnowledgeIntelligence } from './KnowledgeIntelligence';
 import { ExecutiveAiAssistant } from './ExecutiveAi';
+import { ExecutiveShell } from './ExecutiveFoundation';
+import { HomeDashboard } from './HomeDashboard';
 
 function Guard({ children, permission }: { children: ReactNode; permission?: string }) {
   const { user, loading, can } = useAuth();
@@ -74,53 +75,7 @@ function Login() {
 }
 
 function Layout({ children }: { children: ReactNode }) {
-  const { user, can, logout } = useAuth();
-  return (
-    <div className="shell">
-      <aside>
-        <div className="brand">
-          <span>ق</span>
-          <strong>قرآن الهجرة</strong>
-        </div>
-        <nav>
-          {can('dashboard.view') && <NavLink to="/">القيادة التنفيذية</NavLink>}
-          {can('metrics.view') && <NavLink to="/executive/metrics">المؤشرات المؤسسية</NavLink>}
-          {can('strategy.view') && <NavLink to="/executive/objectives">الاستراتيجية</NavLink>}
-          {can('kpi.view') && <NavLink to="/executive/kpis">مؤشرات الأداء</NavLink>}
-          {can('initiatives.view') && <NavLink to="/executive/initiatives">المبادرات</NavLink>}
-          {can('risks.view') && <NavLink to="/executive/risks">المخاطر</NavLink>}
-          {can('alerts.view') && <NavLink to="/executive/alerts">التنبيهات</NavLink>}
-          {can('reports.view') && <NavLink to="/executive/reports">التقارير التنفيذية</NavLink>}
-          {can('documents.view') && <NavLink to="/documents">مركز المعرفة</NavLink>}
-          {can('knowledge.search') && (
-            <NavLink to="/knowledge-intelligence">الذكاء المعرفي</NavLink>
-          )}
-          {can('executive_ai.use') && (
-            <NavLink to="/executive-assistant">المساعد التنفيذي الذكي</NavLink>
-          )}
-          {can('document_analysis.view') && (
-            <NavLink to="/document-analysis">تحليل المستندات</NavLink>
-          )}
-          <NavLink to="/account">حسابي</NavLink>
-          {can('users.view') && <NavLink to="/users">المستخدمون</NavLink>}
-          {can('roles.view') && <NavLink to="/roles">الأدوار والصلاحيات</NavLink>}
-          {can('audit.view') && <NavLink to="/audit">سجل العمليات</NavLink>}
-        </nav>
-        <button className="secondary" onClick={() => void logout()}>
-          تسجيل الخروج
-        </button>
-      </aside>
-      <main className="content">
-        <header>
-          <div>
-            <small>مرحبًا</small>
-            <strong>{user?.fullName}</strong>
-          </div>
-        </header>
-        {children}
-      </main>
-    </div>
-  );
+  return <ExecutiveShell>{children}</ExecutiveShell>;
 }
 
 function Page({ title, children }: { title: string; children: ReactNode }) {
@@ -353,7 +308,7 @@ export default function App() {
             path="/"
             element={
               <ProtectedPage permission="dashboard.view">
-                <ExecutiveDashboard />
+                <HomeDashboard />
               </ProtectedPage>
             }
           />
