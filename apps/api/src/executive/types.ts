@@ -65,8 +65,18 @@ export type PageQuery = {
   pageSize: number;
   search?: string;
   status?: string;
+  severity?: string;
   department?: string;
   objectiveId?: string;
+};
+
+export type DeadlineQuery = PageQuery & {
+  days: number;
+};
+
+export type DeadlineScope = {
+  initiatives: boolean;
+  riskTreatments: boolean;
 };
 
 export type PageResult<T = Record<string, unknown>> = {

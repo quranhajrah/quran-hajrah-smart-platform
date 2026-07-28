@@ -17,6 +17,8 @@ import { KnowledgeIntelligence } from './KnowledgeIntelligence';
 import { ExecutiveAiAssistant } from './ExecutiveAi';
 import { ExecutiveShell } from './ExecutiveFoundation';
 import { HomeDashboard } from './HomeDashboard';
+import { ExecutiveCommandCenter } from './ExecutiveCommandCenter';
+import { TodayAtAssociation } from './TodayAtAssociation';
 
 function Guard({ children, permission }: { children: ReactNode; permission?: string }) {
   const { user, loading, can } = useAuth();
@@ -309,6 +311,22 @@ export default function App() {
             element={
               <ProtectedPage permission="dashboard.view">
                 <HomeDashboard />
+              </ProtectedPage>
+            }
+          />
+          <Route
+            path="/executive/command-center"
+            element={
+              <ProtectedPage permission="dashboard.view">
+                <ExecutiveCommandCenter />
+              </ProtectedPage>
+            }
+          />
+          <Route
+            path="/executive/today"
+            element={
+              <ProtectedPage permission="dashboard.view">
+                <TodayAtAssociation />
               </ProtectedPage>
             }
           />

@@ -65,6 +65,7 @@ const permissions = [
   'reports.create',
   'reports.approve',
   'executive.query',
+  'audit.view',
 ];
 
 const createRole = (name: string, rolePermissions: string[]): PublicRole => ({
@@ -181,6 +182,8 @@ class MemoryExecutiveStore implements ExecutiveStore {
   readonly kpiMeasurements: ExecutiveRecord[] = [];
   readonly alerts: ExecutiveRecord[] = [];
   readonly snapshots: ExecutiveRecord[] = [];
+  readonly activities: ExecutiveRecord[] = [];
+  readonly riskTreatments: ExecutiveRecord[] = [];
   readonly candidates: AlertCandidate[] = [
     {
       fingerprint: 'initiative:delayed:test',
@@ -329,12 +332,16 @@ class MemoryExecutiveStore implements ExecutiveStore {
     return { id: randomUUID(), initiativeId, ...input, createdById: userId };
   }
 
-  addRiskTreatment = async (riskId: string, input: Record<string, unknown>, userId: string) => ({
-    id: randomUUID(),
-    riskId,
-    ...input,
-    createdById: userId,
-  });
+  async addRiskTreatment(riskId: string, input: Record<string, unknown>, userId: string) {
+    const treatment = {
+      id: randomUUID(),
+      riskId,
+      ...input,
+      createdById: userId,
+    };
+    this.riskTreatments.push(treatment);
+    return treatment;
+  }
 
   linkEvidence = async () => undefined;
 
@@ -378,6 +385,52 @@ class MemoryExecutiveStore implements ExecutiveStore {
     };
   }
 
+  async deadlines(
+    query: Parameters<ExecutiveStore['deadlines']>[0],
+    now: Date,
+    scope: Parameters<ExecutiveStore['deadlines']>[2],
+  ) {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + query.days);
+    end.setHours(23, 59, 59, 999);
+    const inWindow = (value: unknown) => {
+      const timestamp = new Date(String(value)).getTime();
+      return timestamp >= start.getTime() && timestamp <= end.getTime();
+    };
+    const items = [
+      ...(scope.initiatives
+        ? this.records.initiatives
+            .filter(
+              (item) =>
+                !item.deletedAt &&
+                !['COMPLETED', 'CANCELLED'].includes(String(item.status)) &&
+                inWindow(item.endDate),
+            )
+            .map((item): ExecutiveRecord => ({ ...item, module: 'initiatives' }))
+        : []),
+      ...(scope.riskTreatments
+        ? this.riskTreatments
+            .filter(
+              (item) => !item.deletedAt && item.status !== 'COMPLETED' && inWindow(item.dueDate),
+            )
+            .map((item): ExecutiveRecord => ({ ...item, module: 'risks' }))
+        : []),
+    ].sort(
+      (left, right) =>
+        new Date(String(left.endDate ?? left.dueDate)).getTime() -
+        new Date(String(right.endDate ?? right.dueDate)).getTime(),
+    );
+    const offset = (query.page - 1) * query.pageSize;
+    return {
+      items: items.slice(offset, offset + query.pageSize),
+      total: items.length,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+  }
+
   getHealthWeights = async () => this.weights;
 
   async updatePreferences(
@@ -400,9 +453,12 @@ class MemoryExecutiveStore implements ExecutiveStore {
   healthHistory = async (limit: number) => this.snapshots.slice(-limit);
 
   async listAlerts(query: PageQuery) {
-    const items = query.status
-      ? this.alerts.filter((item) => item.status === query.status)
+    let items = query.status
+      ? this.alerts.filter((item) => query.status!.split(',').includes(String(item.status)))
       : this.alerts;
+    if (query.severity) {
+      items = items.filter((item) => item.severity === query.severity);
+    }
     return {
       items,
       total: items.length,
@@ -464,12 +520,17 @@ class MemoryExecutiveStore implements ExecutiveStore {
     userId: string,
   ) => this.update('reports', reportId, { status }, userId);
 
-  activity = async (query: PageQuery) => ({
-    items: [] as ExecutiveRecord[],
-    total: 0,
-    page: query.page,
-    pageSize: query.pageSize,
-  });
+  async activity(query: PageQuery, authorizedActionPrefixes: string[]) {
+    const items = this.activities.filter((item) =>
+      authorizedActionPrefixes.some((prefix) => String(item.action).startsWith(prefix)),
+    );
+    return {
+      items,
+      total: items.length,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+  }
 
   countAlerts = async (status?: AlertStatus) =>
     status ? this.alerts.filter((item) => item.status === status).length : this.alerts.length;
@@ -643,10 +704,48 @@ describe('Enterprise 23 executive API', () => {
     expect(risk.body.residualScore).toBe(12);
     const matrix = await admin('get', '/api/executive/risks/heat-matrix');
     expect(matrix.status).toBe(200);
-    expect(matrix.body.matrix[3][4]).toBe(1);
+    expect(matrix.body.scope).toBe('RESIDUAL');
+    expect(matrix.body.criticalThreshold).toBe(15);
+    expect(matrix.body.matrix[2][3]).toBe(1);
     const trend = await admin('get', '/api/executive/risks/trend');
     expect(trend.status).toBe(200);
     expect(trend.body[0].total).toBe(1);
+  });
+
+  it('returns complete permission-scoped initiative and risk-treatment deadlines', async () => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 5);
+    executiveStore.records.initiatives.push({
+      id: randomUUID(),
+      code: 'I-DEADLINE',
+      name: 'Initiative due today',
+      status: 'AT_RISK',
+      endDate: today,
+    });
+    executiveStore.riskTreatments.push({
+      id: randomUUID(),
+      riskId: randomUUID(),
+      title: 'Risk treatment due next week',
+      status: 'ON_TRACK',
+      dueDate: nextWeek,
+    });
+
+    const firstPage = await admin('get', '/api/executive/deadlines?page=1&pageSize=1&days=30');
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body.total).toBe(2);
+    expect(firstPage.body.items).toHaveLength(1);
+    expect(firstPage.body.items[0].module).toBe('initiatives');
+
+    const secondPage = await admin('get', '/api/executive/deadlines?page=2&pageSize=1&days=30');
+    expect(secondPage.body.items[0].module).toBe('risks');
+
+    const restricted = await request(app)
+      .get('/api/executive/deadlines?page=1&pageSize=100&days=30')
+      .set('Authorization', `Bearer ${viewerToken}`);
+    expect(restricted.status).toBe(200);
+    expect(restricted.body).toMatchObject({ total: 0, items: [] });
   });
 
   it('generates idempotent alerts and records alert actions', async () => {
@@ -657,6 +756,57 @@ describe('Enterprise 23 executive API', () => {
     const acknowledged = await admin('post', `/api/executive/alerts/${alertId}/acknowledge`);
     expect(acknowledged.body.status).toBe('ACKNOWLEDGED');
     expect(identityStore.audits.some((audit) => audit.action === 'alerts.acknowledge')).toBe(true);
+
+    const critical = await admin('post', '/api/executive/alerts').send({
+      severity: 'CRITICAL',
+      title: 'Critical operational exception',
+      description: 'Requires immediate executive review.',
+      sourceModule: 'initiatives',
+    });
+    expect(critical.status).toBe(201);
+    const criticalAlerts = await admin(
+      'get',
+      '/api/executive/alerts?page=1&pageSize=20&status=OPEN&severity=CRITICAL',
+    );
+    expect(criticalAlerts.status).toBe(200);
+    expect(criticalAlerts.body.total).toBe(1);
+    expect(criticalAlerts.body.items[0].severity).toBe('CRITICAL');
+  });
+
+  it('filters executive activity by module permission and hides actors without audit access', async () => {
+    executiveStore.activities.push(
+      {
+        id: randomUUID(),
+        action: 'dashboard.preference_update',
+        entityType: 'ExecutiveDashboardPreference',
+        description: 'Dashboard preference updated.',
+        userId: administrator.id,
+        user: { id: administrator.id, fullName: administrator.fullName },
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        action: 'risks.update',
+        entityType: 'InstitutionalRisk',
+        description: 'Restricted risk updated.',
+        userId: administrator.id,
+        user: { id: administrator.id, fullName: administrator.fullName },
+        createdAt: new Date(),
+      },
+    );
+
+    const viewerActivity = await request(app)
+      .get('/api/executive/activity?page=1&pageSize=20')
+      .set('Authorization', `Bearer ${viewerToken}`);
+    expect(viewerActivity.status).toBe(200);
+    expect(viewerActivity.body.total).toBe(1);
+    expect(viewerActivity.body.items[0].action).toBe('dashboard.preference_update');
+    expect(viewerActivity.body.items[0]).not.toHaveProperty('user');
+    expect(viewerActivity.body.items[0]).not.toHaveProperty('userId');
+
+    const administratorActivity = await admin('get', '/api/executive/activity?page=1&pageSize=20');
+    expect(administratorActivity.body.total).toBe(2);
+    expect(administratorActivity.body.items[0].user.fullName).toBe(administrator.fullName);
   });
 
   it('answers supported executive questions using structured records only', async () => {

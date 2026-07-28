@@ -3,6 +3,8 @@ import { database } from '@quran-hajrah/database';
 import type { ExecutiveRecord, ExecutiveStore } from './store.js';
 import type {
   AlertCandidate,
+  DeadlineQuery,
+  DeadlineScope,
   ExecutiveDashboardBase,
   ExecutiveEntity,
   HealthWeights,
@@ -742,6 +744,63 @@ export class PrismaExecutiveStore implements ExecutiveStore {
     };
   }
 
+  async deadlines(query: DeadlineQuery, now: Date, scope: DeadlineScope) {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + query.days);
+    end.setHours(23, 59, 59, 999);
+
+    const [initiatives, treatments] = await Promise.all([
+      scope.initiatives
+        ? database.operationalInitiative.findMany({
+            where: {
+              deletedAt: null,
+              status: { notIn: ['COMPLETED', 'CANCELLED'] },
+              endDate: { gte: start, lte: end },
+            },
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              endDate: true,
+              status: true,
+              owner: { select: { id: true, fullName: true } },
+            },
+            orderBy: { endDate: 'asc' },
+          })
+        : Promise.resolve([]),
+      scope.riskTreatments
+        ? database.riskTreatment.findMany({
+            where: {
+              deletedAt: null,
+              status: { not: 'COMPLETED' },
+              dueDate: { gte: start, lte: end },
+            },
+            select: {
+              id: true,
+              riskId: true,
+              title: true,
+              dueDate: true,
+              status: true,
+              owner: { select: { id: true, fullName: true } },
+            },
+            orderBy: { dueDate: 'asc' },
+          })
+        : Promise.resolve([]),
+    ]);
+    const items = asRecords([
+      ...initiatives.map((item) => ({ ...item, module: 'initiatives' })),
+      ...treatments.map((item) => ({ ...item, module: 'risks' })),
+    ]).sort(
+      (left, right) =>
+        new Date(String(left.endDate ?? left.dueDate)).getTime() -
+        new Date(String(right.endDate ?? right.dueDate)).getTime(),
+    );
+    const startIndex = (query.page - 1) * query.pageSize;
+    return pageResult(items.slice(startIndex, startIndex + query.pageSize), items.length, query);
+  }
+
   async getHealthWeights(userId: string): Promise<HealthWeights> {
     const preference =
       (await database.executiveDashboardPreference.findFirst({
@@ -822,6 +881,7 @@ export class PrismaExecutiveStore implements ExecutiveStore {
           }
         : {}),
       ...(statuses?.length ? { status: { in: statuses as never[] } } : {}),
+      ...(query.severity ? { severity: query.severity as never } : {}),
     };
     const [items, total] = await database.$transaction([
       database.executiveAlert.findMany({
@@ -1076,18 +1136,9 @@ export class PrismaExecutiveStore implements ExecutiveStore {
     );
   }
 
-  async activity(query: PageQuery) {
+  async activity(query: PageQuery, authorizedActionPrefixes: string[]) {
     const where: Prisma.AuditLogWhereInput = {
-      OR: [
-        { action: { startsWith: 'metrics.' } },
-        { action: { startsWith: 'objectives.' } },
-        { action: { startsWith: 'kpi.' } },
-        { action: { startsWith: 'initiatives.' } },
-        { action: { startsWith: 'risks.' } },
-        { action: { startsWith: 'alerts.' } },
-        { action: { startsWith: 'reports.' } },
-        { action: { startsWith: 'dashboard.' } },
-      ],
+      OR: authorizedActionPrefixes.map((prefix) => ({ action: { startsWith: prefix } })),
     };
     const [items, total] = await database.$transaction([
       database.auditLog.findMany({

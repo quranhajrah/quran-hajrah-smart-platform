@@ -1,6 +1,8 @@
 import type {
   AlertCandidate,
   AlertStatus,
+  DeadlineQuery,
+  DeadlineScope,
   ExecutiveDashboardBase,
   ExecutiveEntity,
   HealthWeights,
@@ -73,6 +75,11 @@ export interface ExecutiveStore {
   ): Promise<void>;
 
   dashboardBase(): Promise<ExecutiveDashboardBase>;
+  deadlines(
+    query: DeadlineQuery,
+    now: Date,
+    scope: DeadlineScope,
+  ): Promise<PageResult<ExecutiveRecord>>;
   getHealthWeights(userId: string): Promise<HealthWeights>;
   updatePreferences(
     userId: string,
@@ -117,6 +124,9 @@ export interface ExecutiveStore {
     userId: string,
   ): Promise<ExecutiveRecord>;
 
-  activity(query: PageQuery): Promise<PageResult<ExecutiveRecord>>;
+  activity(
+    query: PageQuery,
+    authorizedActionPrefixes: string[],
+  ): Promise<PageResult<ExecutiveRecord>>;
   countAlerts(status?: AlertStatus): Promise<number>;
 }

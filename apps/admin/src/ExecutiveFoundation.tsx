@@ -35,6 +35,20 @@ const executiveNavigationGroups: NavigationGroup[] = [
         keywords: ['الرئيسية', 'قيادة', 'لوحة'],
       },
       {
+        to: '/executive/command-center',
+        label: 'مركز القيادة التنفيذي',
+        description: 'الاستثناءات والأولويات الحرجة',
+        permission: 'dashboard.view',
+        keywords: ['قيادة', 'استثناءات', 'مخاطر', 'أولويات', 'تنبيهات'],
+      },
+      {
+        to: '/executive/today',
+        label: 'اليوم في الجمعية',
+        description: 'الموجز التنفيذي اليومي',
+        permission: 'dashboard.view',
+        keywords: ['اليوم', 'موجز', 'متابعة', 'استحقاقات'],
+      },
+      {
         to: '/executive/health',
         label: 'الصحة المؤسسية',
         description: 'تفاصيل التقييم والتغطية',
@@ -418,8 +432,8 @@ export function MobileBottomNavigation() {
   const { can } = useAuth();
   const candidates = [
     navigationItems.find((item) => item.to === '/'),
-    navigationItems.find((item) => item.to === '/executive/metrics'),
-    navigationItems.find((item) => item.to === '/documents'),
+    navigationItems.find((item) => item.to === '/executive/command-center'),
+    navigationItems.find((item) => item.to === '/executive/today'),
     navigationItems.find((item) => item.to === '/executive-assistant'),
     navigationItems.find((item) => item.to === '/account'),
   ].filter((item): item is NavigationItem => Boolean(item));
@@ -432,10 +446,10 @@ export function MobileBottomNavigation() {
           <span aria-hidden="true">
             {item.to === '/'
               ? '⌂'
-              : item.to === '/executive/metrics'
-                ? '◫'
-                : item.to === '/documents'
-                  ? '▤'
+              : item.to === '/executive/command-center'
+                ? '◎'
+                : item.to === '/executive/today'
+                  ? '◷'
                   : item.to === '/executive-assistant'
                     ? '✦'
                     : '●'}

@@ -294,7 +294,7 @@ export function HomeDashboard() {
             label: 'مبادرات متأخرة',
             value: data.summary.initiatives.delayed,
             tone: data.summary.initiatives.delayed ? ('danger' as const) : ('good' as const),
-            to: '/executive/initiatives',
+            to: '/executive/command-center?queue=initiatives',
           },
         ]
       : []),
@@ -304,7 +304,7 @@ export function HomeDashboard() {
             label: 'مخاطر حرجة',
             value: data.summary.risks.critical,
             tone: data.summary.risks.critical ? ('danger' as const) : ('good' as const),
-            to: '/executive/risks',
+            to: '/executive/command-center?queue=risks',
           },
         ]
       : []),
@@ -314,7 +314,7 @@ export function HomeDashboard() {
             label: 'مواعيد قادمة',
             value: authorizedDeadlines.length,
             tone: authorizedDeadlines.length ? ('warn' as const) : ('good' as const),
-            to: canViewInitiatives ? '/executive/initiatives' : '/executive/risks',
+            to: '/executive/command-center?queue=deadlines',
           },
         ]
       : []),
@@ -446,6 +446,11 @@ export function HomeDashboard() {
             source="لوحة القيادة التنفيذية"
             freshness={snapshot.loadedAt}
             freshnessFailed={refreshFailed}
+            action={
+              <Link className="ex-card-action" to="/executive/today">
+                فتح موجز اليوم
+              </Link>
+            }
             className="ex-grid-eight"
           >
             <StatusSummaryStrip items={todayItems} />
@@ -550,8 +555,8 @@ export function HomeDashboard() {
             freshness={snapshot.loadedAt}
             freshnessFailed={refreshFailed}
             action={
-              <Link className="ex-card-action" to="/executive/alerts">
-                جميع التنبيهات
+              <Link className="ex-card-action" to="/executive/command-center?queue=alerts">
+                فتح مركز القيادة
               </Link>
             }
             className="ex-grid-five"
@@ -566,7 +571,11 @@ export function HomeDashboard() {
                 emptyTitle="لا توجد تنبيهات مفتوحة"
                 emptyDescription="لا توجد عناصر مسجلة."
                 render={(alert) => (
-                  <Link className="ex-record-item" to="/executive/alerts" key={alert.id}>
+                  <Link
+                    className="ex-record-item"
+                    to="/executive/command-center?queue=alerts"
+                    key={alert.id}
+                  >
                     <span
                       className={`ex-severity is-${recordText(alert, 'severity').toLowerCase()}`}
                     >
@@ -624,6 +633,11 @@ export function HomeDashboard() {
             sourceTo={canViewInitiatives ? '/executive/initiatives' : '/executive/risks'}
             freshness={snapshot.loadedAt}
             freshnessFailed={refreshFailed}
+            action={
+              <Link className="ex-card-action" to="/executive/command-center?queue=deadlines">
+                فتح لوحة الاستحقاقات
+              </Link>
+            }
             className="ex-grid-six"
           >
             <CardStateBoundary

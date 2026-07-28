@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { api, setAccessToken, type AuthPayload, type User } from './api';
 import { clearExecutiveDashboardCache } from './executive-dashboard-data';
+import { clearExecutiveInsightCache } from './executive-insights-data';
 
 type AuthValue = {
   user: User | null;
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const applyAuth = useCallback((payload: AuthPayload | null) => {
     clearExecutiveDashboardCache();
+    clearExecutiveInsightCache();
     setAccessToken(payload?.accessToken ?? null);
     setUser(payload?.user ?? null);
     setPermissions(payload?.permissions ?? []);
@@ -54,8 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       },
       async logout() {
-        await api('/auth/logout', { method: 'POST' });
-        applyAuth(null);
+        try {
+          await api('/auth/logout', { method: 'POST' });
+        } finally {
+          applyAuth(null);
+        }
       },
       can: (permission) => permissions.includes(permission),
     }),

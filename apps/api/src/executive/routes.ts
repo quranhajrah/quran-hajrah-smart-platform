@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { AppConfig } from '../config.js';
 import { asyncRoute, requireAuth, requirePermission, validate } from '../http.js';
 import type { IdentityStore } from '../identity/store.js';
+import { permissionCodes } from '../identity/types.js';
 import type { DocumentStore } from '../documents/store.js';
 import { calculateBudgetVariance } from './calculations.js';
 import { ExecutiveService } from './service.js';
@@ -30,9 +31,13 @@ const pagination = z
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
     search: z.string().trim().max(160).optional(),
     status: z.string().trim().max(120).optional(),
+    severity: z.enum(alertSeverities).optional(),
     department: z.string().trim().max(160).optional(),
     objectiveId: z.string().uuid().optional(),
   })
+  .strict();
+const deadlinePagination = pagination
+  .extend({ days: z.coerce.number().int().min(1).max(30).default(30) })
   .strict();
 const date = z.coerce.date();
 const optionalDate = z.coerce.date().optional();
@@ -324,6 +329,17 @@ const preferenceUpdate = z
   .strict();
 const executiveQuery = z.object({ text: z.string().trim().min(3).max(500) }).strict();
 
+const activityPermissions = [
+  ['dashboard.view', 'dashboard.'],
+  ['metrics.view', 'metrics.'],
+  ['strategy.view', 'objectives.'],
+  ['kpi.view', 'kpi.'],
+  ['initiatives.view', 'initiatives.'],
+  ['risks.view', 'risks.'],
+  ['alerts.view', 'alerts.'],
+  ['reports.view', 'reports.'],
+] as const;
+
 const escapeHtml = (value: unknown) =>
   String(value)
     .replaceAll('&', '&amp;')
@@ -341,12 +357,7 @@ export const createExecutiveRouter = (
 ) => {
   const router = Router();
   const authenticated = requireAuth(identityStore, config);
-  const service = new ExecutiveService(
-    executiveStore,
-    identityStore,
-    documentStore,
-    analysisStore,
-  );
+  const service = new ExecutiveService(executiveStore, identityStore, documentStore, analysisStore);
   const queryLimiter = rateLimit({
     windowMs: config.rateLimitWindowMs,
     limit: Math.min(config.rateLimitMax, 30),
@@ -383,9 +394,40 @@ export const createExecutiveRouter = (
     '/executive/activity',
     requirePermission('dashboard.view'),
     validate(pagination, 'query'),
-    asyncRoute(async (request, response) =>
-      response.json(await executiveStore.activity(request.query as never)),
-    ),
+    asyncRoute(async (request, response) => {
+      const permissions = permissionCodes(request.identity!);
+      const authorizedActionPrefixes = activityPermissions
+        .filter(([permission]) => permissions.includes(permission))
+        .map(([, prefix]) => prefix);
+      const result = await executiveStore.activity(
+        request.query as never,
+        authorizedActionPrefixes,
+      );
+      response.json({
+        ...result,
+        items: permissions.includes('audit.view')
+          ? result.items
+          : result.items.map((item) =>
+              Object.fromEntries(
+                Object.entries(item).filter(([key]) => key !== 'user' && key !== 'userId'),
+              ),
+            ),
+      });
+    }),
+  );
+  router.get(
+    '/executive/deadlines',
+    requirePermission('dashboard.view'),
+    validate(deadlinePagination, 'query'),
+    asyncRoute(async (request, response) => {
+      const permissions = permissionCodes(request.identity!);
+      response.json(
+        await executiveStore.deadlines(request.query as never, new Date(), {
+          initiatives: permissions.includes('initiatives.view'),
+          riskTreatments: permissions.includes('risks.view'),
+        }),
+      );
+    }),
   );
   router.post(
     '/executive/query',
@@ -705,11 +747,17 @@ export const createExecutiveRouter = (
       const impactIndex = Object.fromEntries(riskImpacts.map((value, index) => [value, index]));
       for (const riskItem of risks.items) {
         const risk = riskItem as Record<string, unknown>;
-        matrix[Number(likelihoodIndex[String(risk.likelihood)])]![
-          Number(impactIndex[String(risk.impact)])
+        matrix[Number(likelihoodIndex[String(risk.residualLikelihood)])]![
+          Number(impactIndex[String(risk.residualImpact)])
         ]! += 1;
       }
-      response.json({ likelihoods: riskLikelihoods, impacts: riskImpacts, matrix });
+      response.json({
+        scope: 'RESIDUAL',
+        criticalThreshold: 15,
+        likelihoods: riskLikelihoods,
+        impacts: riskImpacts,
+        matrix,
+      });
     }),
   );
   router.get(
