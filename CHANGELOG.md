@@ -4,6 +4,17 @@ All notable changes to Quran Hajrah Smart Platform are documented here.
 
 ## Unreleased
 
+## [26.1.0] - 2026-07-29
+
+### Enterprise 26.1 Professional Executive Writing
+
+- Replaced extractive-looking document synthesis with a professional Arabic executive-writing pipeline.
+- Added distinct CEO, Board, government-correspondence, donor-proposal, meeting-minutes, executive-report, recommendation, decision, and action-plan styles.
+- Added semantic theme, quantitative-anchor, and status interpretation before drafting.
+- Separated supporting quotations from the original executive answer and added a direct-paragraph-copy guard.
+- Expanded the Executive AI API, administration workspace, and regression coverage without changing Enterprise 25 retrieval or Enterprise 24 extraction.
+- Added no schema migration, external provider, runtime secret, or Hostinger entry-file change.
+
 ## [26.0.0] - 2026-07-27
 
 ### Enterprise 26 Executive AI Assistant

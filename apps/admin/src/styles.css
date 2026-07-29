@@ -1922,6 +1922,30 @@ td small {
 .executive-recommendation p {
   margin: 0.25rem 0;
 }
+.executive-quotes {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #d9e4de;
+  border-radius: 12px;
+  background: #fbfcfb;
+}
+.executive-quotes blockquote {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border-right: 3px solid #789a89;
+  border-radius: 8px;
+  background: #f1f6f3;
+}
+.executive-quotes p {
+  margin: 0;
+  color: #31473e;
+  line-height: 1.8;
+}
+.executive-quotes footer {
+  margin-top: 0.35rem;
+  color: #65786f;
+  font-size: 0.84rem;
+}
 .executive-sources ol {
   display: grid;
   gap: 0.55rem;

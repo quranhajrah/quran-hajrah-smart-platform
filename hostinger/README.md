@@ -81,6 +81,10 @@ Enterprise 26 has no database migration, external provider, new environment vari
 
 After deployment, verify `/health`, `/ready`, and login; then open `/executive-assistant`. Test one sourced question, one Board report, one CEO recommendation, and one official-letter draft with an authorized account. Verify every answered result contains numbered source links and that an unsupported question returns `INSUFFICIENT_EVIDENCE`. Repeat with a restricted account and confirm confidential document evidence is absent. Do not enable an external model or add provider credentials for this release.
 
+### Enterprise 26.1 professional-writing update
+
+Enterprise 26.1 uses the same build, entry file, environment, database, and permissions as Enterprise 26. It adds no migration or external provider. After deployment, exercise all nine writing profiles from `/executive-assistant`; verify that the answer is professional original Arabic, supporting quotations appear in their separate section, source links remain authorized, and no document paragraph appears directly in the answer. Recheck `INSUFFICIENT_EVIDENCE` and confidential-source denial with a restricted account.
+
 The seed adds seven analysis permissions, safe role defaults, deterministic rule identifiers, and the bounded default analysis configuration. It never seeds extracted values.
 
 After deployment, use an authorized account to open a non-sensitive supported document, start analysis explicitly, inspect pages/tables/proposals, approve one evidence-backed proposal, run conflict preview, and confirm import. Open the imported Enterprise 23 record and verify “عرض المصدر”. An image-only PDF must report `OCR_REQUIRED`.

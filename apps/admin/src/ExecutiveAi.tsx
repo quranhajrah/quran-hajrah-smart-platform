@@ -3,7 +3,16 @@ import { api } from './api';
 import { useAuth } from './auth';
 import { Link } from './router';
 
-type Mode = 'QUESTION' | 'BOARD_REPORT' | 'CEO_RECOMMENDATIONS' | 'OFFICIAL_LETTER';
+type Mode =
+  | 'QUESTION'
+  | 'BOARD_REPORT'
+  | 'CEO_RECOMMENDATIONS'
+  | 'OFFICIAL_LETTER'
+  | 'DONOR_PROPOSAL'
+  | 'MEETING_MINUTES'
+  | 'EXECUTIVE_REPORT'
+  | 'DECISION'
+  | 'ACTION_PLAN';
 type Source = {
   reference: number;
   documentId: string;
@@ -19,6 +28,13 @@ type ExecutiveAiResponse = {
   answer: string;
   executiveRecommendation: string;
   sources: Source[];
+  supportingReferences: Array<{ reference: number; quote: string; relevance: string }>;
+  writing: {
+    style: string;
+    audience: string;
+    purpose: string;
+    method: 'PROFESSIONAL_REWRITE';
+  };
   evidence: { chunkCount: number; documentCount: number; combinedMultipleDocuments: boolean };
   limitations: string[];
 };
@@ -32,12 +48,31 @@ const modes: Array<{ value: Mode; label: string; permission: string }> = [
     permission: 'executive_ai.recommendations',
   },
   { value: 'OFFICIAL_LETTER', label: 'خطاب رسمي', permission: 'executive_ai.letters' },
+  { value: 'DONOR_PROPOSAL', label: 'مقترح مانح', permission: 'executive_ai.reports' },
+  { value: 'MEETING_MINUTES', label: 'محضر اجتماع', permission: 'executive_ai.reports' },
+  { value: 'EXECUTIVE_REPORT', label: 'تقرير تنفيذي', permission: 'executive_ai.reports' },
+  { value: 'DECISION', label: 'مشروع قرار', permission: 'executive_ai.recommendations' },
+  { value: 'ACTION_PLAN', label: 'خطة عمل', permission: 'executive_ai.recommendations' },
 ];
 const endpoints: Record<Mode, string> = {
   QUESTION: '/executive-ai/ask',
   BOARD_REPORT: '/executive-ai/board-report',
   CEO_RECOMMENDATIONS: '/executive-ai/recommendations',
   OFFICIAL_LETTER: '/executive-ai/official-letter',
+  DONOR_PROPOSAL: '/executive-ai/donor-proposal',
+  MEETING_MINUTES: '/executive-ai/meeting-minutes',
+  EXECUTIVE_REPORT: '/executive-ai/executive-report',
+  DECISION: '/executive-ai/decision',
+  ACTION_PLAN: '/executive-ai/action-plan',
+};
+const defaultTasks: Record<Exclude<Mode, 'QUESTION' | 'OFFICIAL_LETTER'>, string> = {
+  BOARD_REPORT: 'إعداد تقرير مجلس الإدارة من المعرفة المؤسسية',
+  CEO_RECOMMENDATIONS: 'إعداد توصيات تنفيذية للرئيس التنفيذي',
+  DONOR_PROPOSAL: 'إعداد مقترح مهني موجه إلى جهة مانحة',
+  MEETING_MINUTES: 'إعداد مسودة محضر اجتماع تنفيذي',
+  EXECUTIVE_REPORT: 'إعداد تقرير تنفيذي مهني',
+  DECISION: 'إعداد مشروع قرار تنفيذي',
+  ACTION_PLAN: 'إعداد خطة عمل تنفيذية',
 };
 const suggestions = [
   'ما رؤية الجمعية؟',
@@ -70,9 +105,9 @@ export function ExecutiveAiAssistant() {
           body: JSON.stringify({
             question:
               question.trim() ||
-              (mode === 'BOARD_REPORT'
-                ? 'إعداد تقرير مجلس الإدارة من المعرفة المؤسسية'
-                : 'إعداد توصيات تنفيذية للرئيس التنفيذي'),
+              (mode === 'QUESTION' || mode === 'OFFICIAL_LETTER'
+                ? question.trim()
+                : defaultTasks[mode]),
             ...(mode === 'OFFICIAL_LETTER' ? { recipient, subject } : {}),
           }),
         }),
@@ -88,11 +123,11 @@ export function ExecutiveAiAssistant() {
     <section className="page executive-ai">
       <div className="executive-ai-hero">
         <div>
-          <span>Enterprise 26</span>
+          <span>Enterprise 26.1</span>
           <h1>المساعد التنفيذي الذكي</h1>
-          <p>طبقة استدلال عربية فوق المعرفة المؤسسية، لا تُصدر إجابة أو توصية بلا مرجع.</p>
+          <p>كاتب تنفيذي عربي يفهم المراجع ويعيد بناءها مهنيًا دون نسخ فقراتها.</p>
         </div>
-        <div className="evidence-seal">الأدلة أولًا</div>
+        <div className="evidence-seal">صياغة أصلية موثقة</div>
       </div>
 
       <div className="executive-ai-layout">
@@ -156,18 +191,20 @@ export function ExecutiveAiAssistant() {
               ))}
             </div>
           )}
-          <button disabled={busy}>{busy ? 'جارٍ ترتيب الأدلة…' : 'إنشاء إجابة موثقة'}</button>
+          <button disabled={busy}>
+            {busy ? 'جارٍ فهم المراجع وإعادة الصياغة…' : 'إنشاء صياغة تنفيذية'}
+          </button>
           <small>
-            لا تُرسل هذه النسخة البيانات إلى خدمة ذكاء اصطناعي خارجية. الصياغة محلية ومقيدة بالمقاطع
-            المصرح بها.
+            تُكتب النتيجة محليًا بلغة تنفيذية أصلية، وتظهر اقتباسات المراجع في قسم مستقل.
           </small>
         </form>
 
         <aside className="card executive-ai-policy">
           <h2>ضوابط الإجابة</h2>
           <ul>
-            <li>كل معلومة مرتبطة بمرجع قابل للفتح.</li>
-            <li>تُدمج عدة وثائق عندما تدعم الأدلة ذلك.</li>
+            <li>لا تُنسخ فقرات المستند داخل متن النتيجة.</li>
+            <li>تُفهم الدلالات ثم تُعاد كتابتها بحسب الجمهور والغرض.</li>
+            <li>تظهر الاقتباسات الداعمة منفصلة عن النص التنفيذي.</li>
             <li>تُحترم سرية المستند وصلاحيات المستخدم.</li>
             <li>عند غياب الدليل لا تُنشأ إجابة.</li>
           </ul>
@@ -175,7 +212,7 @@ export function ExecutiveAiAssistant() {
       </div>
 
       {error && <div className="status error">{error}</div>}
-      {busy && <div className="status">جارٍ استرجاع الأدلة وترتيبها وصياغة النتيجة…</div>}
+      {busy && <div className="status">جارٍ قراءة المراجع وفهمها وبناء الصياغة التنفيذية…</div>}
       {response && (
         <section className="card executive-ai-response">
           <div className="section-heading">
@@ -186,6 +223,7 @@ export function ExecutiveAiAssistant() {
               </h2>
             </div>
             <div className="evidence-stats">
+              <span>{response.writing.audience}</span>
               <span>{response.evidence.documentCount} مستند</span>
               <span>{response.evidence.chunkCount} مرجع</span>
             </div>
@@ -195,6 +233,19 @@ export function ExecutiveAiAssistant() {
             <div className="executive-recommendation">
               <h3>التوصية التنفيذية</h3>
               <p>{response.executiveRecommendation}</p>
+            </div>
+          )}
+          {response.supportingReferences.length > 0 && (
+            <div className="executive-quotes">
+              <h3>الاقتباسات الداعمة — منفصلة عن الصياغة</h3>
+              {response.supportingReferences.map((reference) => (
+                <blockquote key={reference.reference}>
+                  <p>
+                    [{reference.reference}] «{reference.quote}»
+                  </p>
+                  <footer>{reference.relevance}</footer>
+                </blockquote>
+              ))}
             </div>
           )}
           {response.sources.length > 0 && (

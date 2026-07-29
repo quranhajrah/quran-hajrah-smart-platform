@@ -4,7 +4,7 @@ import type { IdentityStore } from '../identity/store.js';
 import type { IdentityUser, RequestMeta } from '../identity/types.js';
 import { ArabicExecutiveQueryPlanner } from './planner.js';
 import { DiverseExecutiveEvidenceRanker } from './ranker.js';
-import { EvidenceBoundExecutiveSynthesisProvider } from './synthesis.js';
+import { ProfessionalArabicExecutiveWritingProvider } from './synthesis.js';
 import type {
   ExecutiveAiAuditSink,
   ExecutiveAiEvidenceRanker,
@@ -37,11 +37,12 @@ export class IdentityAuditSink implements ExecutiveAiAuditSink {
       userId: input.user.id,
       action: `EXECUTIVE_AI_${input.request.type}`,
       entityType: 'ExecutiveAiReasoning',
-      description: 'Evidence-bound executive reasoning request completed.',
+      description: 'Professional evidence-bound executive writing request completed.',
       metadata: {
         version: input.response.version,
         questionHash: createHash('sha256').update(input.request.question.trim()).digest('hex'),
         intent: input.response.intent,
+        writingStyle: input.response.writing.style,
         status: input.response.status,
         evidenceCount: input.response.evidence.chunkCount,
         documentCount: input.response.evidence.documentCount,
@@ -58,7 +59,7 @@ export class ExecutiveAiReasoningService {
     private readonly audit: ExecutiveAiAuditSink,
     private readonly planner: ExecutiveAiQueryPlanner = new ArabicExecutiveQueryPlanner(),
     private readonly ranker: ExecutiveAiEvidenceRanker = new DiverseExecutiveEvidenceRanker(),
-    private readonly synthesis: ExecutiveAiSynthesisProvider = new EvidenceBoundExecutiveSynthesisProvider(),
+    private readonly synthesis: ExecutiveAiSynthesisProvider = new ProfessionalArabicExecutiveWritingProvider(),
   ) {}
 
   async execute(

@@ -1,10 +1,18 @@
 import type { IdentityUser, RequestMeta } from '../identity/types.js';
 import type { KnowledgeSearchResult, KnowledgeSourceReference } from '../knowledge/types.js';
 
-export const EXECUTIVE_AI_VERSION = '26.0.0';
+export const EXECUTIVE_AI_VERSION = '26.1.0';
 
 export type ExecutiveAiRequestType =
-  'QUESTION' | 'BOARD_REPORT' | 'CEO_RECOMMENDATIONS' | 'OFFICIAL_LETTER';
+  | 'QUESTION'
+  | 'BOARD_REPORT'
+  | 'CEO_RECOMMENDATIONS'
+  | 'OFFICIAL_LETTER'
+  | 'DONOR_PROPOSAL'
+  | 'MEETING_MINUTES'
+  | 'EXECUTIVE_REPORT'
+  | 'DECISION'
+  | 'ACTION_PLAN';
 
 export type ExecutiveAiIntent =
   | 'VISION'
@@ -15,7 +23,23 @@ export type ExecutiveAiIntent =
   | 'BOARD_REPORT'
   | 'CEO_RECOMMENDATIONS'
   | 'OFFICIAL_LETTER'
+  | 'DONOR_PROPOSAL'
+  | 'MEETING_MINUTES'
+  | 'EXECUTIVE_REPORT'
+  | 'DECISION'
+  | 'ACTION_PLAN'
   | 'GENERAL';
+
+export type ExecutiveWritingStyle =
+  | 'CEO'
+  | 'BOARD_OF_DIRECTORS'
+  | 'GOVERNMENT_CORRESPONDENCE'
+  | 'DONOR_PROPOSAL'
+  | 'MEETING_MINUTES'
+  | 'EXECUTIVE_REPORT'
+  | 'RECOMMENDATIONS'
+  | 'DECISION'
+  | 'ACTION_PLAN';
 
 export type ExecutiveAiRequest = {
   type: ExecutiveAiRequestType;
@@ -36,6 +60,12 @@ export type RankedExecutiveEvidence = KnowledgeSearchResult & {
   matchedSignals: string[];
 };
 
+export type ExecutiveSupportingReference = {
+  reference: number;
+  quote: string;
+  relevance: string;
+};
+
 export type ExecutiveAiResponse = {
   version: typeof EXECUTIVE_AI_VERSION;
   status: 'ANSWERED' | 'INSUFFICIENT_EVIDENCE';
@@ -44,6 +74,13 @@ export type ExecutiveAiResponse = {
   answer: string;
   executiveRecommendation: string;
   sources: KnowledgeSourceReference[];
+  supportingReferences: ExecutiveSupportingReference[];
+  writing: {
+    style: ExecutiveWritingStyle;
+    audience: string;
+    purpose: string;
+    method: 'PROFESSIONAL_REWRITE';
+  };
   evidence: {
     chunkCount: number;
     documentCount: number;

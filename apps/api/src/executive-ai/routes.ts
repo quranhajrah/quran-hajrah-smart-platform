@@ -15,6 +15,21 @@ const reportSchema = z
 const recommendationsSchema = z
   .object({ question: question.optional().default('إعداد توصيات تنفيذية للرئيس التنفيذي') })
   .strict();
+const donorProposalSchema = z
+  .object({ question: question.optional().default('إعداد مقترح مهني موجه إلى جهة مانحة') })
+  .strict();
+const meetingMinutesSchema = z
+  .object({ question: question.optional().default('إعداد مسودة محضر اجتماع تنفيذي') })
+  .strict();
+const executiveReportSchema = z
+  .object({ question: question.optional().default('إعداد تقرير تنفيذي مهني') })
+  .strict();
+const decisionSchema = z
+  .object({ question: question.optional().default('إعداد مشروع قرار تنفيذي') })
+  .strict();
+const actionPlanSchema = z
+  .object({ question: question.optional().default('إعداد خطة عمل تنفيذية') })
+  .strict();
 const letterSchema = z
   .object({
     question,
@@ -60,7 +75,20 @@ export const createExecutiveAiRouter = (
       language: 'ar',
       evidenceRequired: true,
       externalGenerativeProvider: false,
-      modes: ['QUESTION', 'BOARD_REPORT', 'CEO_RECOMMENDATIONS', 'OFFICIAL_LETTER'],
+      professionalRewrite: true,
+      directParagraphCopying: false,
+      referencesPresentedSeparately: true,
+      modes: [
+        'QUESTION',
+        'BOARD_REPORT',
+        'CEO_RECOMMENDATIONS',
+        'OFFICIAL_LETTER',
+        'DONOR_PROPOSAL',
+        'MEETING_MINUTES',
+        'EXECUTIVE_REPORT',
+        'DECISION',
+        'ACTION_PLAN',
+      ],
     }),
   );
   router.post(
@@ -90,6 +118,41 @@ export const createExecutiveAiRouter = (
     limiter,
     validate(letterSchema),
     action(service, 'OFFICIAL_LETTER'),
+  );
+  router.post(
+    '/executive-ai/donor-proposal',
+    requirePermission('executive_ai.reports'),
+    limiter,
+    validate(donorProposalSchema),
+    action(service, 'DONOR_PROPOSAL'),
+  );
+  router.post(
+    '/executive-ai/meeting-minutes',
+    requirePermission('executive_ai.reports'),
+    limiter,
+    validate(meetingMinutesSchema),
+    action(service, 'MEETING_MINUTES'),
+  );
+  router.post(
+    '/executive-ai/executive-report',
+    requirePermission('executive_ai.reports'),
+    limiter,
+    validate(executiveReportSchema),
+    action(service, 'EXECUTIVE_REPORT'),
+  );
+  router.post(
+    '/executive-ai/decision',
+    requirePermission('executive_ai.recommendations'),
+    limiter,
+    validate(decisionSchema),
+    action(service, 'DECISION'),
+  );
+  router.post(
+    '/executive-ai/action-plan',
+    requirePermission('executive_ai.recommendations'),
+    limiter,
+    validate(actionPlanSchema),
+    action(service, 'ACTION_PLAN'),
   );
   return router;
 };
