@@ -138,6 +138,45 @@ class MemoryIdentityStore implements IdentityStore {
 
 const sourceDocuments: DocumentRecord[] = [];
 let documentDashboardCalls = 0;
+const sourceDocument = (
+  owner: IdentityUser,
+  title: string,
+  confidentialityLevel: DocumentRecord['confidentialityLevel'],
+  fileSize: bigint,
+): DocumentRecord => {
+  const now = new Date('2026-07-29T12:00:00.000Z');
+  return {
+    id: randomUUID(),
+    title,
+    originalFileName: `${title}.pdf`,
+    storedFileName: `${randomUUID()}.pdf`,
+    mimeType: 'application/pdf',
+    fileSize,
+    storagePath: `documents/${randomUUID()}.pdf`,
+    categoryId: randomUUID(),
+    category: {
+      id: randomUUID(),
+      name: 'Governance',
+      slug: `governance-${randomUUID()}`,
+      isActive: true,
+      sortOrder: 0,
+    },
+    documentType: 'GOVERNANCE',
+    versionNumber: 1,
+    status: 'ACTIVE',
+    confidentialityLevel,
+    owningDepartment: 'Governance',
+    keywords: [],
+    isArchived: false,
+    createdById: owner.id,
+    updatedById: owner.id,
+    createdBy: { id: owner.id, fullName: owner.fullName },
+    updatedBy: { id: owner.id, fullName: owner.fullName },
+    createdAt: now,
+    updatedAt: now,
+    tags: [],
+  };
+};
 const documentStore: DocumentStore = {
   listCategories: async () => [],
   listOwningDepartments: async () => [],
@@ -162,15 +201,18 @@ const documentStore: DocumentStore = {
   listAudit: async () => ({ items: [], total: 0 }),
   createAudit: async () => undefined,
   hasAccessRule: async () => false,
-  dashboard: async () => {
+  dashboard: async (access) => {
     documentDashboardCalls += 1;
+    const recent = sourceDocuments.filter((document) =>
+      access.allowedLevels.includes(document.confidentialityLevel),
+    );
     return {
-      total: 0,
-      active: 0,
+      total: recent.length,
+      active: recent.filter((document) => document.status === 'ACTIVE').length,
       underReview: 0,
       expiring: 0,
       archived: 0,
-      recent: [],
+      recent,
     };
   },
 };
@@ -614,6 +656,49 @@ describe('Enterprise 23 executive API', () => {
     expect(executiveStore.dashboardBaseCalls).toBe(1);
     expect(documentDashboardCalls).toBe(1);
     expect(response.body.health.missingData).toContain('الحوكمة');
+  });
+
+  it('serializes dashboard BigInt values without bypassing RBAC or confidentiality scope', async () => {
+    const safeDocument = sourceDocument(administrator, 'Public report', 'PUBLIC', 2048n);
+    const unsafeFileSize = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
+    const restrictedDocument = sourceDocument(
+      administrator,
+      'Restricted report',
+      'HIGHLY_CONFIDENTIAL',
+      unsafeFileSize,
+    );
+    sourceDocuments.push(safeDocument, restrictedDocument);
+
+    const viewerResponse = await request(app)
+      .get('/api/executive/dashboard')
+      .set('Authorization', `Bearer ${viewerToken}`);
+
+    expect(viewerResponse.status).toBe(200);
+    expect(viewerResponse.body.recentDocuments).toHaveLength(1);
+    expect(viewerResponse.body.recentDocuments[0]).toMatchObject({
+      id: safeDocument.id,
+      title: 'Public report',
+      fileSize: 2048,
+      createdAt: '2026-07-29T12:00:00.000Z',
+    });
+    expect(viewerResponse.text).not.toContain(restrictedDocument.id);
+    expect(viewerResponse.body.summary.activeUsers).toBe(2);
+
+    const adminResponse = await admin('get', '/api/executive/dashboard');
+
+    expect(adminResponse.status).toBe(200);
+    expect(adminResponse.body.recentDocuments).toHaveLength(2);
+    expect(adminResponse.body.recentDocuments[1].fileSize).toBe(unsafeFileSize.toString(10));
+    expect(adminResponse.body).not.toHaveProperty('failingOperation');
+    expect(adminResponse.body).not.toHaveProperty('originalError');
+
+    const dashboardCallsBeforeForbiddenRequest = documentDashboardCalls;
+    const forbiddenResponse = await request(app)
+      .get('/api/executive/dashboard')
+      .set('Authorization', `Bearer ${metricOperatorToken}`);
+
+    expect(forbiddenResponse.status).toBe(403);
+    expect(documentDashboardCalls).toBe(dashboardCallsBeforeForbiddenRequest);
   });
 
   it('logs an operation-scoped production diagnostic before returning INTERNAL_ERROR', async () => {

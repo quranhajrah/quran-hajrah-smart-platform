@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import type { AppConfig } from '../config.js';
 import { asyncRoute, requireAuth, requirePermission, validate } from '../http.js';
+import { normalizeJsonResponse } from '../json-response.js';
 import type { Logger } from '../logger.js';
 import type { IdentityStore } from '../identity/store.js';
 import { permissionCodes } from '../identity/types.js';
@@ -374,7 +375,8 @@ export const createExecutiveRouter = (
     requirePermission('dashboard.view'),
     asyncRoute(async (request, response) => {
       try {
-        response.json(await service.dashboard(request.identity!));
+        const dashboard = await service.dashboard(request.identity!);
+        response.json(normalizeJsonResponse(dashboard));
       } catch (error) {
         logger.error({
           event: 'executive_dashboard_failed',
