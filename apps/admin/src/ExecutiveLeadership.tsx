@@ -71,6 +71,24 @@ const distributionTone: Record<string, string> = {
   ON_HOLD: 'warning',
 };
 
+const kpiStatusLabels: Record<(typeof kpiStatuses)[number], string> = {
+  NOT_STARTED: 'لم يبدأ',
+  ON_TRACK: 'على المسار',
+  AT_RISK: 'معرض للخطر',
+  OFF_TRACK: 'خارج المسار',
+  COMPLETED: 'مكتمل',
+};
+
+const initiativeStatusLabels: Record<(typeof initiativeStatuses)[number], string> = {
+  PLANNED: 'مخططة',
+  ACTIVE: 'نشطة',
+  AT_RISK: 'معرضة للخطر',
+  DELAYED: 'متأخرة',
+  COMPLETED: 'مكتملة',
+  CANCELLED: 'ملغاة',
+  ON_HOLD: 'متوقفة مؤقتًا',
+};
+
 const resultItems = (result: InsightResult<PageResult>) =>
   result.status === 'success' ? result.value.items : [];
 const freshness = <T,>(result: InsightResult<T>) =>
@@ -214,7 +232,7 @@ export function ExecutiveLeadership() {
     try {
       setRiskTrend((await loadRiskTrend(user.id)).value);
     } catch {
-      setRiskTrendError('تعذر تحميل اتجاه المخاطر. بقيت بقية الصفحة متاحة.');
+      setRiskTrendError('تعذر تحميل توزيع المخاطر حسب شهر التسجيل. بقيت بقية الصفحة متاحة.');
     } finally {
       setRiskTrendBusy(false);
     }
@@ -261,7 +279,7 @@ export function ExecutiveLeadership() {
 
   const kpiDistribution: StatusDistributionItem[] = kpiStatuses.map((status) => ({
     key: status,
-    label: formatStatus(status),
+    label: kpiStatusLabels[status],
     value: Number(kpiSummary[status] ?? 0),
     tone: distributionTone[status]!,
     to: `/executive/kpis?status=${status}`,
@@ -270,7 +288,7 @@ export function ExecutiveLeadership() {
 
   const initiativeDistribution: StatusDistributionItem[] = initiativeStatuses.map((status) => ({
     key: status,
-    label: formatStatus(status),
+    label: initiativeStatusLabels[status],
     value: initiatives.filter((initiative) => recordString(initiative, 'status') === status).length,
     tone: distributionTone[status]!,
     to: `/executive/initiatives?status=${status}`,
@@ -699,7 +717,7 @@ export function ExecutiveLeadership() {
                   disabled={riskTrendBusy}
                   onClick={() => void requestRiskTrend()}
                 >
-                  {riskTrendBusy ? 'جارٍ تحميل الاتجاه…' : 'تحميل اتجاه المخاطر'}
+                  {riskTrendBusy ? 'جارٍ تحميل التوزيع…' : 'تحميل التوزيع حسب شهر التسجيل'}
                 </button>
               }
               className="ex-grid-full"
@@ -761,7 +779,14 @@ export function ExecutiveLeadership() {
                 </div>
                 {riskTrendError && <MutationFeedback tone="error" message={riskTrendError} />}
                 {riskTrend && (
-                  <div className="ex-risk-trend" aria-label="الاتجاه الرقمي للمخاطر">
+                  <div
+                    className="ex-risk-trend"
+                    aria-label="توزيع المخاطر حسب شهر التسجيل وحالتها الحالية"
+                  >
+                    <p>
+                      توزيع حسب شهر تسجيل الخطر، وتُحتسب حالته ودرجته الحالية؛ لا يمثل سجلًا
+                      تاريخيًا لتغير الحالة.
+                    </p>
                     {riskTrend.map((point) => (
                       <div key={recordString(point, 'month')}>
                         <strong>{recordString(point, 'month')}</strong>

@@ -428,6 +428,7 @@ const page = (items: unknown[]) => ({ items, total: items.length, page: 1, pageS
 type FetchOptions = {
   queryFailure?: boolean;
   knowledgeInsufficient?: boolean;
+  knowledgeAnswerResponse?: Promise<Response>;
   writingStatus?: number;
 };
 
@@ -499,6 +500,7 @@ function createFetch(permissions: string[], options: FetchOptions = {}) {
     }
     if (path === '/knowledge/search') return json({ items: [knowledgeSource] });
     if (path === '/knowledge/answer') {
+      if (options.knowledgeAnswerResponse) return options.knowledgeAnswerResponse;
       return options.knowledgeInsufficient
         ? json({
             status: 'INSUFFICIENT_EVIDENCE',
@@ -643,8 +645,11 @@ describe('Sprint 1C executive leadership dashboard', () => {
     expect(screen.getByText('الحد الحرج: 15 من 25')).toBeTruthy();
     expect(screen.getByText('المقياس: احتمال 1–5 × أثر 1–5')).toBeTruthy();
     expect(screen.getByText('خطر استمرارية الخدمة')).toBeTruthy();
-    await interaction.click(screen.getByRole('button', { name: 'تحميل اتجاه المخاطر' }));
-    expect(await screen.findByLabelText('الاتجاه الرقمي للمخاطر')).toBeTruthy();
+    await interaction.click(screen.getByRole('button', { name: 'تحميل التوزيع حسب شهر التسجيل' }));
+    expect(
+      await screen.findByLabelText('توزيع المخاطر حسب شهر التسجيل وحالتها الحالية'),
+    ).toBeTruthy();
+    expect(screen.getByText(/لا يمثل سجلًا تاريخيًا لتغير الحالة/)).toBeTruthy();
     await interaction.click(screen.getAllByRole('button', { name: 'تحميل سجل الاتجاه' })[0]!);
     expect(await screen.findByLabelText('سجل قياسات إجمالي المستفيدين')).toBeTruthy();
     expect(
@@ -711,6 +716,31 @@ describe('Sprint 1C governed executive Smart Bar', () => {
     expect(within(dialog).getByRole('option', { name: /لوحة القيادة القيادية/ })).toBeTruthy();
     fireEvent.keyDown(search, { key: 'Enter' });
     expect(window.location.pathname).toBe('/executive/leadership');
+  });
+
+  it('traps dialog focus, closes with Escape, and restores the invoking control', async () => {
+    renderRoute('/', ['dashboard.view', 'executive.query']);
+    await screen.findByRole('heading', { name: 'لوحة القيادة التنفيذية' });
+    const interaction = userEvent.setup();
+    const trigger = screen.getAllByRole('button', {
+      name: 'فتح الشريط التنفيذي الذكي',
+    })[0]!;
+    await interaction.click(trigger);
+    const dialog = await screen.findByRole('dialog', { name: 'شريط الانتقال التنفيذي' });
+    const focusable = [
+      ...dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ];
+    const first = focusable[0]!;
+    const last = focusable.at(-1)!;
+    last.focus();
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(window.document.activeElement).toBe(first);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(window.document.activeElement).toBe(trigger);
   });
 
   it('runs structured queries explicitly, reports source and limitations, and retains input on error', async () => {
@@ -784,6 +814,54 @@ describe('Sprint 1C governed executive Smart Bar', () => {
     await interaction.click(within(dialog).getByRole('button', { name: 'إنشاء الإجابة' }));
     expect(await within(dialog).findByRole('heading', { name: 'الأدلة غير كافية' })).toBeTruthy();
     expect(within(dialog).getByText('لم تتحقق تغطية كافية.')).toBeTruthy();
+  });
+
+  it('aborts in-flight knowledge work and cannot restore protected results after closing', async () => {
+    let releaseAnswer!: (response: Response) => void;
+    const knowledgeAnswerResponse = new Promise<Response>((resolve) => {
+      releaseAnswer = resolve;
+    });
+    const fetchMock = renderRoute('/', ['dashboard.view', 'knowledge.ask'], {
+      knowledgeAnswerResponse,
+    });
+    await screen.findByRole('heading', { name: 'لوحة القيادة التنفيذية' });
+    const interaction = userEvent.setup();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    let dialog = await screen.findByRole('dialog', { name: 'شريط الانتقال التنفيذي' });
+    await interaction.click(within(dialog).getByRole('tab', { name: 'المعرفة والأدلة' }));
+    await interaction.type(
+      within(dialog).getByLabelText('موضوع البحث أو السؤال'),
+      'نتيجة يجب مسحها',
+    );
+    await interaction.click(within(dialog).getByRole('button', { name: 'إنشاء الإجابة' }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([input]) => String(input).includes('/knowledge/answer')),
+      ).toBe(true),
+    );
+    const answerCall = fetchMock.mock.calls.find(([input]) =>
+      String(input).includes('/knowledge/answer'),
+    );
+
+    await interaction.click(within(dialog).getByRole('button', { name: 'إغلاق' }));
+    expect((answerCall?.[1]?.signal as AbortSignal | undefined)?.aborted).toBe(true);
+    releaseAnswer(
+      json({
+        status: 'ANSWERED',
+        answer: 'نتيجة محمية متأخرة',
+        sources: [{ ...knowledgeSource, reference: 1 }],
+        limitations: [],
+      }),
+    );
+    await Promise.resolve();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    dialog = await screen.findByRole('dialog', { name: 'شريط الانتقال التنفيذي' });
+    await interaction.click(within(dialog).getByRole('tab', { name: 'المعرفة والأدلة' }));
+    expect((within(dialog).getByLabelText('موضوع البحث أو السؤال') as HTMLInputElement).value).toBe(
+      '',
+    );
+    expect(within(dialog).queryByText('نتيجة محمية متأخرة')).toBeNull();
   });
 
   it('loads Enterprise 26.1 capabilities on demand and separates prose, quotations, sources, and limits', async () => {

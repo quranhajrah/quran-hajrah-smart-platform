@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { clearExecutiveDashboardCache } from './executive-dashboard-data';
+import { clearExecutiveDashboardCache, loadExecutiveDashboard } from './executive-dashboard-data';
 
 const user = {
   id: '10000000-0000-4000-8000-000000000026',
@@ -139,6 +139,29 @@ afterEach(() => {
 });
 
 describe('Sprint 1A executive foundation and home dashboard', () => {
+  it('broadcasts authorization failures so all protected executive caches can be cleared', async () => {
+    const authorizationFailure = vi.fn();
+    window.addEventListener('executive-authorization-failure', authorizationFailure);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json(
+          {
+            error: {
+              code: 'FORBIDDEN',
+              message: 'غير مصرح.',
+            },
+          },
+          403,
+        ),
+      ),
+    );
+
+    await expect(loadExecutiveDashboard(user.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(authorizationFailure).toHaveBeenCalledOnce();
+    window.removeEventListener('executive-authorization-failure', authorizationFailure);
+  });
+
   it('preserves the layout while loading and renders an authorized empty card state', async () => {
     let releaseDashboard!: (response: Response) => void;
     const pendingDashboard = new Promise<Response>((resolve) => {

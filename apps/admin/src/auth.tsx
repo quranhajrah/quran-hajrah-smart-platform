@@ -42,6 +42,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, [applyAuth]);
 
+  useEffect(() => {
+    const clearProtectedCaches = () => {
+      clearExecutiveDashboardCache();
+      clearExecutiveInsightCache();
+    };
+    window.addEventListener('executive-authorization-failure', clearProtectedCaches);
+    return () =>
+      window.removeEventListener('executive-authorization-failure', clearProtectedCaches);
+  }, []);
+
   const value = useMemo<AuthValue>(
     () => ({
       user,

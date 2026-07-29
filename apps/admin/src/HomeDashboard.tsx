@@ -703,11 +703,14 @@ export function HomeDashboard() {
                     <span>
                       <strong>{document.title}</strong>
                       <small>
-                        {document.category?.name ?? document.documentType} · الإصدار{' '}
-                        {document.versionNumber.toLocaleString('ar-SA')}
+                        {document.category?.name || document.documentType || MISSING_VALUE} ·
+                        الإصدار{' '}
+                        {typeof document.versionNumber === 'number'
+                          ? document.versionNumber.toLocaleString('ar-SA')
+                          : MISSING_VALUE}
                       </small>
                     </span>
-                    <time>{new Date(document.updatedAt).toLocaleDateString('ar-SA')}</time>
+                    <time>{recordDate(document, 'updatedAt')}</time>
                   </Link>
                 ))}
               </div>

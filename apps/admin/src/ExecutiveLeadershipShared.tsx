@@ -458,10 +458,26 @@ export function ExecutiveReportPipeline({
   reports: ExecutiveRecord[];
   can(permission: string): boolean;
 }) {
+  const reportStatusLabels: Record<string, string> = {
+    DRAFT: 'مسودة',
+    GENERATED: 'مولّد',
+    APPROVED: 'معتمد',
+    ARCHIVED: 'مؤرشف',
+  };
+  const reportTypeLabels: Record<string, string> = {
+    BOARD: 'مجلس الإدارة',
+    MONTHLY_PERFORMANCE: 'الأداء الشهري',
+    QUARTERLY_PERFORMANCE: 'الأداء الربعي',
+    OPERATIONAL_PLAN: 'الخطة التشغيلية',
+    RISKS: 'المخاطر',
+    GOVERNANCE: 'الحوكمة',
+    KNOWLEDGE_CENTER: 'مركز المعرفة',
+    COMPREHENSIVE: 'شامل',
+  };
   const statuses = ['DRAFT', 'GENERATED', 'APPROVED', 'ARCHIVED'];
   const distribution = statuses.map((status) => ({
     key: status,
-    label: formatStatus(status),
+    label: reportStatusLabels[status]!,
     value: reports.filter((report) => recordString(report, 'status') === status).length,
     tone: status.toLocaleLowerCase('en'),
     to: `/executive/reports?status=${status}`,
@@ -474,10 +490,16 @@ export function ExecutiveReportPipeline({
           <article role="listitem" key={report.id}>
             <header>
               <div>
-                <small>{formatStatus(recordString(report, 'reportType'))}</small>
+                <small>
+                  {reportTypeLabels[recordString(report, 'reportType')] ??
+                    formatStatus(recordString(report, 'reportType'))}
+                </small>
                 <h3>{recordString(report, 'title')}</h3>
               </div>
-              <span>{formatStatus(recordString(report, 'status'))}</span>
+              <span>
+                {reportStatusLabels[recordString(report, 'status')] ??
+                  formatStatus(recordString(report, 'status'))}
+              </span>
             </header>
             <p>
               المُعد: {relatedName(report, 'preparedBy')} · التحديث: {formatDate(report.updatedAt)}

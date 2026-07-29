@@ -218,6 +218,7 @@
 }
 
 .ex-header-signout {
+  min-height: 44px;
   padding: 0.55rem 0.8rem;
   color: var(--ex-green);
   background: transparent;
@@ -260,7 +261,7 @@
 
 .ex-smartbar-dock > button {
   width: min(100%, 720px);
-  min-height: 42px;
+  min-height: 44px;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -1084,6 +1085,11 @@ a.ex-source-badge {
   color: #124c3b;
   background: #eef6f2;
   border-color: #d8e9e1;
+}
+
+.ex-smartbar-results > button.is-active small,
+.ex-smartbar-results > button:hover small {
+  color: #52685f;
 }
 
 .ex-mobile-nav {

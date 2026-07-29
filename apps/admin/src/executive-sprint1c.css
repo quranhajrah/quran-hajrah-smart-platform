@@ -1126,13 +1126,14 @@
   }
 
   .ex-smartbar-modes {
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
     padding-inline: 0.75rem;
   }
 
   .ex-smartbar-modes button {
-    flex: 0 0 auto;
-    min-width: 118px;
+    min-width: 0;
   }
 
   .ex-smartbar-tool {

@@ -51,6 +51,7 @@ export function loadExecutiveDashboard(
         ['FORBIDDEN', 'INVALID_SESSION', 'AUTHENTICATION_REQUIRED'].includes(error.code ?? '')
       ) {
         clearExecutiveDashboardCache();
+        window.dispatchEvent(new Event('executive-authorization-failure'));
       }
       throw error;
     })

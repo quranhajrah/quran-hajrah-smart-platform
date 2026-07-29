@@ -156,6 +156,7 @@ async function loadQuery<T>(
       if (error instanceof ApiRequestError && protectedFailureCodes.has(error.code ?? '')) {
         clearExecutiveInsightCache();
         clearExecutiveDashboardCache();
+        window.dispatchEvent(new Event('executive-authorization-failure'));
       }
       throw error;
     })

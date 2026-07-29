@@ -58,6 +58,15 @@ const statusLabels: Record<string, string> = {
   CRITICAL: 'حرج',
 };
 
+const registryStatusOptions: Record<EntityDefinition['key'], string[]> = {
+  metrics: [],
+  objectives: ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'OFF_TRACK', 'COMPLETED'],
+  kpis: ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'OFF_TRACK', 'COMPLETED'],
+  initiatives: ['PLANNED', 'ACTIVE', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED', 'ON_HOLD'],
+  risks: ['OPEN', 'UNDER_TREATMENT', 'ACCEPTED', 'CLOSED'],
+  reports: ['DRAFT', 'GENERATED', 'APPROVED', 'ARCHIVED'],
+};
+
 const labelStatus = (status: unknown) => statusLabels[String(status)] ?? String(status ?? '—');
 const badgeClass = (status: unknown) =>
   `executive-badge executive-badge-${String(status ?? 'neutral').toLowerCase()}`;
@@ -526,13 +535,19 @@ const formatCell = (value: unknown, format?: string) => {
 
 export function ExecutiveRegistry({ definition }: { definition: EntityDefinition }) {
   const { can } = useAuth();
+  const initialQuery = useMemo(() => new URLSearchParams(window.location.search), []);
   const [result, setResult] = useState<PageResult>({ items: [], total: 0, page: 1, pageSize: 20 });
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [page, setPage] = useState(() => {
+    const value = Number(initialQuery.get('page'));
+    return Number.isInteger(value) && value > 0 ? value : 1;
+  });
+  const [search, setSearch] = useState(() => initialQuery.get('search')?.slice(0, 160) ?? '');
+  const [status, setStatus] = useState(() => initialQuery.get('status')?.slice(0, 120) ?? '');
+  const [objectiveId, setObjectiveId] = useState(() => initialQuery.get('objectiveId') ?? '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const statusOptions = registryStatusOptions[definition.key];
 
   const load = useCallback(() => {
     setLoading(true);
@@ -542,12 +557,24 @@ export function ExecutiveRegistry({ definition }: { definition: EntityDefinition
       pageSize: '20',
       ...(search ? { search } : {}),
       ...(status ? { status } : {}),
+      ...(objectiveId ? { objectiveId } : {}),
     });
     api<PageResult>(`/executive/${definition.key}?${query}`)
       .then(setResult)
       .catch(() => setError(`تعذر تحميل ${definition.title}.`))
       .finally(() => setLoading(false));
-  }, [definition, page, search, status]);
+  }, [definition, objectiveId, page, search, status]);
+
+  useEffect(() => {
+    const query = new URLSearchParams({
+      ...(page > 1 ? { page: String(page) } : {}),
+      ...(search ? { search } : {}),
+      ...(status ? { status } : {}),
+      ...(objectiveId ? { objectiveId } : {}),
+    });
+    const target = `${window.location.pathname}${query.size ? `?${query}` : ''}`;
+    window.history.replaceState(window.history.state, '', target);
+  }, [objectiveId, page, search, status]);
 
   useEffect(() => {
     const timeout = window.setTimeout(load, 250);
@@ -586,31 +613,39 @@ export function ExecutiveRegistry({ definition }: { definition: EntityDefinition
             setPage(1);
           }}
         />
-        <select
-          aria-label="تصفية الحالة"
-          value={status}
-          onChange={(event) => {
-            setStatus(event.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">كل الحالات</option>
-          {[
-            'ACTIVE',
-            'ON_TRACK',
-            'AT_RISK',
-            'OFF_TRACK',
-            'DELAYED',
-            'OPEN',
-            'DRAFT',
-            'APPROVED',
-          ].map((value) => (
-            <option key={value} value={value}>
-              {labelStatus(value)}
-            </option>
-          ))}
-        </select>
+        {statusOptions.length > 0 ? (
+          <select
+            aria-label="تصفية الحالة"
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">كل الحالات</option>
+            {statusOptions.map((value) => (
+              <option key={value} value={value}>
+                {labelStatus(value)}
+              </option>
+            ))}
+          </select>
+        ) : null}
       </div>
+      {objectiveId && (
+        <div className="status info" role="status">
+          <span>يعرض السجل العناصر المرتبطة بالهدف المحدد.</span>
+          <button
+            className="secondary"
+            type="button"
+            onClick={() => {
+              setObjectiveId('');
+              setPage(1);
+            }}
+          >
+            إلغاء عامل ارتباط الهدف
+          </button>
+        </div>
+      )}
       <AsyncState loading={loading} error={error} empty={result.items.length === 0}>
         <div className="table-wrap executive-table">
           <table>
@@ -1017,36 +1052,54 @@ export function ExecutiveDetail({ entity }: { entity: EntityDefinition['key'] })
   const [sourceReferences, setSourceReferences] = useState<SourceEvidenceReference[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [supportingDataWarning, setSupportingDataWarning] = useState('');
   const [value, setValue] = useState('');
 
   const load = useCallback(async () => {
+    setError('');
+    setSupportingDataWarning('');
+    let next: ExecutiveRecord;
     try {
-      const next = await api<ExecutiveRecord>(`/executive/${entity}/${id}`);
+      next = await api<ExecutiveRecord>(`/executive/${entity}/${id}`);
       setRecord(next);
-      if (can('document_analysis.view')) {
-        const sourceType = {
-          metrics: 'METRIC',
-          objectives: 'STRATEGIC_OBJECTIVE',
-          kpis: 'KPI',
-          initiatives: 'INITIATIVE',
-          risks: 'RISK',
-          reports: 'EXECUTIVE_REPORT_SECTION',
-        }[entity];
+    } catch {
+      setError('تعذر تحميل تفاصيل السجل.');
+      setLoading(false);
+      return;
+    }
+
+    const supportingFailures: string[] = [];
+    if (can('document_analysis.view')) {
+      const sourceType = {
+        metrics: 'METRIC',
+        objectives: 'STRATEGIC_OBJECTIVE',
+        kpis: 'KPI',
+        initiatives: 'INITIATIVE',
+        risks: 'RISK',
+        reports: 'EXECUTIVE_REPORT_SECTION',
+      }[entity];
+      try {
         setSourceReferences(
           await api<SourceEvidenceReference[]>(`/document-analysis/sources/${sourceType}/${id}`),
         );
+      } catch {
+        setSourceReferences([]);
+        supportingFailures.push('تعذر تحميل الأدلة المؤسسية المرتبطة.');
       }
-      if (entity === 'metrics' || entity === 'kpis') {
+    }
+    if (entity === 'metrics' || entity === 'kpis') {
+      try {
         const historyResult = await api<PageResult>(
           `/executive/${entity}/${id}/${entity === 'metrics' ? 'history' : 'trend'}?page=1&pageSize=50`,
         );
         setHistory(historyResult.items);
+      } catch {
+        setHistory([]);
+        supportingFailures.push('تعذر تحميل سجل القياسات المساند.');
       }
-    } catch {
-      setError('تعذر تحميل تفاصيل السجل.');
-    } finally {
-      setLoading(false);
     }
+    setSupportingDataWarning(supportingFailures.join(' '));
+    setLoading(false);
   }, [can, entity, id]);
 
   useEffect(() => void load(), [load]);
@@ -1098,6 +1151,11 @@ export function ExecutiveDetail({ entity }: { entity: EntityDefinition['key'] })
                 <span className={badgeClass(record.status)}>{labelStatus(record.status)}</span>
               )}
             </div>
+            {supportingDataWarning && (
+              <div className="status warning" role="status">
+                {supportingDataWarning} يستمر عرض السجل الأساسي المصرح به.
+              </div>
+            )}
             <Section title="بيانات السجل">
               <dl className="executive-details">
                 {Object.entries(record)

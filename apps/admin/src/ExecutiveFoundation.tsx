@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -576,6 +577,7 @@ export function ExecutiveWritingForm({
 }: {
   definitions: ExecutiveWritingDefinition[];
 }) {
+  const requestRef = useRef<AbortController | null>(null);
   const [capability, setCapability] = useState(definitions[0]?.capability ?? 'QUESTION');
   const [question, setQuestion] = useState('');
   const [recipient, setRecipient] = useState('');
@@ -592,25 +594,44 @@ export function ExecutiveWritingForm({
     }
   }, [capability, definitions]);
 
+  useEffect(
+    () => () => {
+      requestRef.current?.abort();
+      requestRef.current = null;
+    },
+    [],
+  );
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!definition) return;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setBusy(true);
     setError('');
     try {
       setResult(
-        await generateSmartBarWriting(definition, {
-          question: question.trim(),
-          recipient: recipient.trim(),
-          subject: subject.trim(),
-        }),
+        await generateSmartBarWriting(
+          definition,
+          {
+            question: question.trim(),
+            recipient: recipient.trim(),
+            subject: subject.trim(),
+          },
+          controller.signal,
+        ),
       );
     } catch (failure) {
+      if (controller.signal.aborted) return;
       setError(
         smartBarError(failure, 'تعذر إنشاء الصياغة. بقيت جميع المدخلات محفوظة لإعادة المحاولة.'),
       );
     } finally {
-      setBusy(false);
+      if (requestRef.current === controller) {
+        requestRef.current = null;
+        if (!controller.signal.aborted) setBusy(false);
+      }
     }
   };
 
@@ -693,8 +714,13 @@ export function ExecutiveWritingForm({
 export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose(): void }) {
   const { can } = useAuth();
   const navigate = useNavigate();
+  const dialogRef = useRef<HTMLElement>(null);
   const navigationInputRef = useRef<HTMLInputElement>(null);
   const modeInputRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const structuredRequestRef = useRef<AbortController | null>(null);
+  const knowledgeRequestRef = useRef<AbortController | null>(null);
+  const capabilityRequestRef = useRef<AbortController | null>(null);
   const [mode, setMode] = useState<SmartBarMode>('navigation');
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -761,6 +787,27 @@ export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose():
         else window.dispatchEvent(new CustomEvent('executive-smartbar-open'));
       }
       if (event.key === 'Escape' && open) onClose();
+      if (event.key === 'Tab' && open) {
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+        const focusable = [
+          ...dialog.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ].filter((element) => !element.hasAttribute('hidden'));
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (!first || !last) {
+          event.preventDefault();
+          dialog.focus();
+        } else if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -768,21 +815,38 @@ export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose():
 
   useEffect(() => {
     if (!open) {
+      structuredRequestRef.current?.abort();
+      knowledgeRequestRef.current?.abort();
+      capabilityRequestRef.current?.abort();
+      structuredRequestRef.current = null;
+      knowledgeRequestRef.current = null;
+      capabilityRequestRef.current = null;
       setMode('navigation');
       setQuery('');
       setActiveIndex(0);
       setStructuredInput('');
       setStructuredResult(null);
+      setStructuredReceivedAt('');
       setStructuredError('');
+      setStructuredBusy(false);
       setKnowledgeInput('');
       setKnowledgeSearchItems([]);
       setKnowledgeAnswer(null);
       setKnowledgeError('');
+      setKnowledgeBusy(false);
       setCapabilities(null);
       setCapabilityError('');
+      setCapabilityBusy(false);
       return;
     }
-    window.setTimeout(() => navigationInputRef.current?.focus(), 0);
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const timer = window.setTimeout(() => navigationInputRef.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -797,24 +861,37 @@ export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose():
 
   useEffect(() => {
     if (!open) return;
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       if (mode === 'navigation') navigationInputRef.current?.focus();
       else modeInputRef.current?.focus();
     }, 0);
+    return () => window.clearTimeout(timer);
   }, [mode, open]);
 
   useEffect(() => {
-    if (!open || mode !== 'writing' || capabilities || capabilityBusy || capabilityError) return;
+    if (!open || mode !== 'writing' || capabilities || capabilityError) return;
+    const controller = new AbortController();
+    capabilityRequestRef.current = controller;
     setCapabilityBusy(true);
-    void loadExecutiveAiCapabilities()
-      .then(setCapabilities)
-      .catch((error: unknown) =>
-        setCapabilityError(
-          smartBarError(error, 'تعذر تحميل صيغ الكتابة المتاحة. أعد المحاولة لاحقًا.'),
-        ),
-      )
-      .finally(() => setCapabilityBusy(false));
-  }, [capabilities, capabilityBusy, capabilityError, mode, open]);
+    void loadExecutiveAiCapabilities(controller.signal)
+      .then((next) => {
+        if (!controller.signal.aborted) setCapabilities(next);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setCapabilityError(
+            smartBarError(error, 'تعذر تحميل صيغ الكتابة المتاحة. أعد المحاولة لاحقًا.'),
+          );
+        }
+      })
+      .finally(() => {
+        if (capabilityRequestRef.current === controller) {
+          capabilityRequestRef.current = null;
+          if (!controller.signal.aborted) setCapabilityBusy(false);
+        }
+      });
+    return () => controller.abort();
+  }, [capabilities, capabilityError, mode, open]);
 
   if (!open || availableModes.length === 0) return null;
 
@@ -840,49 +917,79 @@ export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose():
 
   const submitStructured = async (event: FormEvent) => {
     event.preventDefault();
+    structuredRequestRef.current?.abort();
+    const controller = new AbortController();
+    structuredRequestRef.current = controller;
     setStructuredBusy(true);
     setStructuredError('');
     try {
-      setStructuredResult(await runStructuredExecutiveQuery(structuredInput.trim()));
-      setStructuredReceivedAt(new Date().toISOString());
+      const next = await runStructuredExecutiveQuery(structuredInput.trim(), controller.signal);
+      if (!controller.signal.aborted) {
+        setStructuredResult(next);
+        setStructuredReceivedAt(new Date().toISOString());
+      }
     } catch (error) {
+      if (controller.signal.aborted) return;
       setStructuredError(
         smartBarError(error, 'تعذر تنفيذ الاستعلام المؤسسي. بقي السؤال محفوظًا لإعادة المحاولة.'),
       );
     } finally {
-      setStructuredBusy(false);
+      if (structuredRequestRef.current === controller) {
+        structuredRequestRef.current = null;
+        if (!controller.signal.aborted) setStructuredBusy(false);
+      }
     }
   };
 
   const submitKnowledge = async (event: FormEvent) => {
     event.preventDefault();
+    knowledgeRequestRef.current?.abort();
+    const controller = new AbortController();
+    knowledgeRequestRef.current = controller;
     setKnowledgeBusy(true);
     setKnowledgeError('');
     try {
       if (knowledgeAction === 'search') {
-        const response = await searchInstitutionalKnowledge(knowledgeInput.trim());
-        setKnowledgeSearchItems(response.items);
-        setKnowledgeAnswer(null);
+        const response = await searchInstitutionalKnowledge(
+          knowledgeInput.trim(),
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
+          setKnowledgeSearchItems(response.items);
+          setKnowledgeAnswer(null);
+        }
       } else {
-        setKnowledgeAnswer(await answerFromInstitutionalKnowledge(knowledgeInput.trim()));
-        setKnowledgeSearchItems([]);
+        const response = await answerFromInstitutionalKnowledge(
+          knowledgeInput.trim(),
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
+          setKnowledgeAnswer(response);
+          setKnowledgeSearchItems([]);
+        }
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       setKnowledgeError(
         smartBarError(error, 'تعذر الوصول إلى المعرفة. بقي السؤال محفوظًا لإعادة المحاولة.'),
       );
     } finally {
-      setKnowledgeBusy(false);
+      if (knowledgeRequestRef.current === controller) {
+        knowledgeRequestRef.current = null;
+        if (!controller.signal.aborted) setKnowledgeBusy(false);
+      }
     }
   };
 
   return (
     <div className="ex-smartbar-layer" role="presentation" onMouseDown={onClose}>
       <section
+        ref={dialogRef}
         className="ex-smartbar ex-smartbar-expanded"
         role="dialog"
         aria-modal="true"
         aria-labelledby="executive-smartbar-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="ex-smartbar-heading">
@@ -1110,6 +1217,7 @@ export function ExecutiveLayout({ children }: { children: ReactNode }) {
     can('knowledge.search') ||
     can('knowledge.ask') ||
     can('executive_ai.use');
+  const closeSmartBar = useCallback(() => setSmartBarOpen(false), []);
 
   useEffect(() => {
     if (!smartBarAvailable) setSmartBarOpen(false);
@@ -1159,9 +1267,7 @@ export function ExecutiveLayout({ children }: { children: ReactNode }) {
         <main className="ex-content">{children}</main>
       </div>
       <MobileBottomNavigation />
-      {smartBarAvailable && (
-        <ExecutiveSmartBar open={smartBarOpen} onClose={() => setSmartBarOpen(false)} />
-      )}
+      {smartBarAvailable && <ExecutiveSmartBar open={smartBarOpen} onClose={closeSmartBar} />}
     </div>
   );
 }

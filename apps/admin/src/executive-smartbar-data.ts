@@ -129,30 +129,34 @@ export const executiveWritingDefinitions: ExecutiveWritingDefinition[] = [
   },
 ];
 
-export const runStructuredExecutiveQuery = (text: string) =>
+export const runStructuredExecutiveQuery = (text: string, signal?: AbortSignal) =>
   api<ExecutiveStructuredQueryResult>('/executive/query', {
     method: 'POST',
     body: JSON.stringify({ text }),
+    signal,
   });
 
-export const searchInstitutionalKnowledge = (query: string) =>
+export const searchInstitutionalKnowledge = (query: string, signal?: AbortSignal) =>
   api<{ items: KnowledgeSearchItem[] }>('/knowledge/search', {
     method: 'POST',
     body: JSON.stringify({ query, limit: 8 }),
+    signal,
   });
 
-export const answerFromInstitutionalKnowledge = (query: string) =>
+export const answerFromInstitutionalKnowledge = (query: string, signal?: AbortSignal) =>
   api<KnowledgeAnswer>('/knowledge/answer', {
     method: 'POST',
     body: JSON.stringify({ query }),
+    signal,
   });
 
-export const loadExecutiveAiCapabilities = () =>
-  api<ExecutiveAiCapabilities>('/executive-ai/capabilities');
+export const loadExecutiveAiCapabilities = (signal?: AbortSignal) =>
+  api<ExecutiveAiCapabilities>('/executive-ai/capabilities', { signal });
 
 export const generateSmartBarWriting = (
   definition: ExecutiveWritingDefinition,
   input: { question: string; recipient?: string; subject?: string },
+  signal?: AbortSignal,
 ) =>
   api<ExecutiveAiWritingResponse>(definition.endpoint, {
     method: 'POST',
@@ -165,6 +169,7 @@ export const generateSmartBarWriting = (
           }
         : { question: input.question },
     ),
+    signal,
   });
 
 export const structuredRecords = (data: unknown): ExecutiveRecord[] =>

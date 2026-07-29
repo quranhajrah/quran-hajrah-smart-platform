@@ -328,4 +328,96 @@ describe('admin authentication flow', () => {
     expect(await screen.findByText('مساعد تنفيذي — إصدار البيانات المؤسسية')).toBeTruthy();
     expect((await screen.findAllByText('لا توجد بيانات معتمدة')).length).toBeGreaterThan(0);
   });
+
+  it('applies and preserves governed registry filters from executive journey links', async () => {
+    const objectiveId = '30000000-0000-4000-8000-000000000026';
+    window.history.replaceState(
+      {},
+      '',
+      `/executive/kpis?status=OFF_TRACK&objectiveId=${objectiveId}`,
+    );
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      const json = (body: unknown) =>
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      if (url.endsWith('/auth/refresh')) {
+        return json({
+          accessToken: 'test-access-token',
+          user: admin,
+          permissions: ['kpi.view'],
+        });
+      }
+      if (url.includes('/executive/kpis?')) {
+        return json({ items: [], total: 0, page: 1, pageSize: 20 });
+      }
+      return json({ error: { code: 'NOT_FOUND' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const interaction = userEvent.setup();
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'إدارة مؤشرات الأداء' })).toBeTruthy();
+    expect((screen.getByLabelText('تصفية الحالة') as HTMLSelectElement).value).toBe('OFF_TRACK');
+    expect(screen.getByText('يعرض السجل العناصر المرتبطة بالهدف المحدد.')).toBeTruthy();
+    await waitFor(() => {
+      const registryCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).includes('/executive/kpis?'),
+      );
+      const url = new URL(String(registryCall?.[0]));
+      expect(url.searchParams.get('status')).toBe('OFF_TRACK');
+      expect(url.searchParams.get('objectiveId')).toBe(objectiveId);
+    });
+
+    await interaction.type(screen.getByLabelText('بحث في السجل'), 'الحضور');
+    await waitFor(() => expect(window.location.search).toContain('search=%D8%A7%D9%84%D8%AD'));
+    await interaction.click(screen.getByRole('button', { name: 'إلغاء عامل ارتباط الهدف' }));
+    await waitFor(() => expect(window.location.search).not.toContain('objectiveId'));
+    expect(window.location.search).toContain('status=OFF_TRACK');
+  });
+
+  it('keeps an authorized source record visible when optional evidence loading fails', async () => {
+    const riskId = '30000000-0000-4000-8000-00000000001d';
+    window.history.replaceState({}, '', `/executive/risks/${riskId}`);
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      const json = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      if (url.endsWith('/auth/refresh')) {
+        return json({
+          accessToken: 'test-access-token',
+          user: admin,
+          permissions: ['risks.view', 'document_analysis.view'],
+        });
+      }
+      if (url.endsWith(`/executive/risks/${riskId}`)) {
+        return json({
+          id: riskId,
+          code: 'R-1D',
+          title: 'خطر تحقق تشغيلي',
+          status: 'UNDER_TREATMENT',
+          residualScore: 16,
+        });
+      }
+      if (url.includes('/document-analysis/sources/RISK/')) {
+        return json({ error: { code: 'INTERNAL_ERROR' } }, 500);
+      }
+      return json({ error: { code: 'NOT_FOUND' } }, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'خطر تحقق تشغيلي' })).toBeTruthy();
+    expect(
+      screen.getByText('تعذر تحميل الأدلة المؤسسية المرتبطة. يستمر عرض السجل الأساسي المصرح به.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('تعذر تحميل تفاصيل السجل.')).toBeNull();
+  });
 });

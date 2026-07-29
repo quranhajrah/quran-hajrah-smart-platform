@@ -22,6 +22,11 @@ import './executive-sprint1b.css';
 export const MISSING_VALUE = 'لا توجد بيانات معتمدة';
 
 const statusLabels: Record<string, string> = {
+  NOT_STARTED: 'لم يبدأ',
+  PLANNED: 'مخططة',
+  ACTIVE: 'نشطة',
+  COMPLETED: 'مكتملة',
+  ON_HOLD: 'متوقفة مؤقتًا',
   OPEN: 'مفتوح',
   ACKNOWLEDGED: 'تم الاطلاع',
   RESOLVED: 'مغلق بالمعالجة',
@@ -45,6 +50,9 @@ const statusLabels: Record<string, string> = {
   FAILED: 'متعذرة',
   OCR_REQUIRED: 'تتطلب OCR',
   CANCELLED: 'ملغاة',
+  DRAFT: 'مسودة',
+  GENERATED: 'مولّد',
+  ARCHIVED: 'مؤرشف',
 };
 
 const severityLabels: Record<string, string> = {
