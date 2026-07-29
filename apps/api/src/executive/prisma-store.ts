@@ -1,5 +1,9 @@
 import type { Prisma } from '@prisma/client';
 import { database } from '@quran-hajrah/database';
+import {
+  runExecutiveDashboardOperation,
+  runExecutiveDashboardOperationSync,
+} from './dashboard-diagnostics.js';
 import type { ExecutiveRecord, ExecutiveStore } from './store.js';
 import type {
   AlertCandidate,
@@ -634,114 +638,136 @@ export class PrismaExecutiveStore implements ExecutiveStore {
       initiativeDeadlines,
       treatmentDeadlines,
     ] = await Promise.all([
-      database.user.count({ where: { isActive: true } }),
-      database.auditLog.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-        select: {
-          id: true,
-          action: true,
-          entityType: true,
-          entityId: true,
-          description: true,
-          createdAt: true,
-          user: { select: { id: true, fullName: true } },
-        },
-      }),
-      this.metricSummaries(),
-      database.strategicObjective.aggregate({
-        where: { deletedAt: null },
-        _count: { id: true },
-        _avg: { progress: true },
-      }),
-      database.strategicKpi.groupBy({
-        by: ['status'],
-        where: { deletedAt: null },
-        _count: { _all: true },
-      }),
-      database.operationalInitiative.findMany({
-        where: { deletedAt: null },
-        select: { status: true, budget: true, actualSpending: true },
-      }),
-      database.institutionalRisk.findMany({
-        where: { deletedAt: null },
-        select: { status: true, residualScore: true },
-      }),
-      database.executiveAlert.findMany({
-        where: { deletedAt: null, status: { in: ['OPEN', 'ACKNOWLEDGED'] } },
-        orderBy: [{ severity: 'desc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
-        take: 10,
-      }),
-      database.operationalInitiative.findMany({
-        where: {
-          deletedAt: null,
-          status: { notIn: ['COMPLETED', 'CANCELLED'] },
-          endDate: { gte: now, lte: nextThirtyDays },
-        },
-        select: { id: true, code: true, name: true, endDate: true, status: true },
-        orderBy: { endDate: 'asc' },
-        take: 10,
-      }),
-      database.riskTreatment.findMany({
-        where: {
-          deletedAt: null,
-          status: { not: 'COMPLETED' },
-          dueDate: { gte: now, lte: nextThirtyDays },
-        },
-        select: { id: true, title: true, dueDate: true, status: true, riskId: true },
-        orderBy: { dueDate: 'asc' },
-        take: 10,
-      }),
+      runExecutiveDashboardOperation('prisma.user.count_active', () =>
+        database.user.count({ where: { isActive: true } }),
+      ),
+      runExecutiveDashboardOperation('prisma.audit_log.recent_activity', () =>
+        database.auditLog.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            action: true,
+            entityType: true,
+            entityId: true,
+            description: true,
+            createdAt: true,
+            user: { select: { id: true, fullName: true } },
+          },
+        }),
+      ),
+      runExecutiveDashboardOperation('prisma.institutional_metric.summary', () =>
+        this.metricSummaries(),
+      ),
+      runExecutiveDashboardOperation('prisma.strategic_objective.aggregate', () =>
+        database.strategicObjective.aggregate({
+          where: { deletedAt: null },
+          _count: { id: true },
+          _avg: { progress: true },
+        }),
+      ),
+      runExecutiveDashboardOperation('prisma.strategic_kpi.group_by_status', () =>
+        database.strategicKpi.groupBy({
+          by: ['status'],
+          where: { deletedAt: null },
+          _count: { _all: true },
+        }),
+      ),
+      runExecutiveDashboardOperation('prisma.operational_initiative.aggregate', () =>
+        database.operationalInitiative.findMany({
+          where: { deletedAt: null },
+          select: { status: true, budget: true, actualSpending: true },
+        }),
+      ),
+      runExecutiveDashboardOperation('prisma.institutional_risk.aggregate', () =>
+        database.institutionalRisk.findMany({
+          where: { deletedAt: null },
+          select: { status: true, residualScore: true },
+        }),
+      ),
+      runExecutiveDashboardOperation('prisma.executive_alert.active', () =>
+        database.executiveAlert.findMany({
+          where: { deletedAt: null, status: { in: ['OPEN', 'ACKNOWLEDGED'] } },
+          orderBy: [{ severity: 'desc' }, { dueDate: 'asc' }, { createdAt: 'desc' }],
+          take: 10,
+        }),
+      ),
+      runExecutiveDashboardOperation('prisma.operational_initiative.deadlines', () =>
+        database.operationalInitiative.findMany({
+          where: {
+            deletedAt: null,
+            status: { notIn: ['COMPLETED', 'CANCELLED'] },
+            endDate: { gte: now, lte: nextThirtyDays },
+          },
+          select: { id: true, code: true, name: true, endDate: true, status: true },
+          orderBy: { endDate: 'asc' },
+          take: 10,
+        }),
+      ),
+      runExecutiveDashboardOperation('prisma.risk_treatment.deadlines', () =>
+        database.riskTreatment.findMany({
+          where: {
+            deletedAt: null,
+            status: { not: 'COMPLETED' },
+            dueDate: { gte: now, lte: nextThirtyDays },
+          },
+          select: { id: true, title: true, dueDate: true, status: true, riskId: true },
+          orderBy: { dueDate: 'asc' },
+          take: 10,
+        }),
+      ),
     ]);
-    const riskOpen = risks.filter((risk) => risk.status !== 'CLOSED');
-    return {
-      activeUsers,
-      recentActivity: asRecords(recentActivity),
-      metrics,
-      objectives: {
-        total: objectives._count.id,
-        averageProgress: numeric(objectives._avg.progress),
-      },
-      kpis: Object.fromEntries(kpiGroups.map((group) => [group.status, group._count._all])),
-      initiatives: {
-        total: initiatives.length,
-        active: initiatives.filter((initiative) => initiative.status === 'ACTIVE').length,
-        delayed: initiatives.filter((initiative) => initiative.status === 'DELAYED').length,
-        atRisk: initiatives.filter((initiative) => initiative.status === 'AT_RISK').length,
-        completed: initiatives.filter((initiative) => initiative.status === 'COMPLETED').length,
-        plannedBudget: initiatives.reduce(
-          (total, initiative) => total + Number(initiative.budget),
-          0,
-        ),
-        actualSpending: initiatives.reduce(
-          (total, initiative) => total + Number(initiative.actualSpending),
-          0,
-        ),
-      },
-      risks: {
-        open: riskOpen.length,
-        critical: riskOpen.filter((risk) => risk.residualScore >= 15).length,
-        averageResidualScore:
-          riskOpen.length === 0
-            ? null
-            : Math.round(
-                (riskOpen.reduce((total, risk) => total + risk.residualScore, 0) /
-                  riskOpen.length) *
-                  100,
-              ) / 100,
-      },
-      alerts: asRecords(alerts),
-      upcomingDeadlines: asRecords([
-        ...initiativeDeadlines.map((deadline) => ({ ...deadline, module: 'initiatives' })),
-        ...treatmentDeadlines.map((deadline) => ({ ...deadline, module: 'risks' })),
-      ])
-        .sort((left, right) =>
-          String(left.endDate ?? left.dueDate).localeCompare(
-            String(right.endDate ?? right.dueDate),
+    return runExecutiveDashboardOperationSync('executive.dashboard.base_aggregation', () => {
+      const riskOpen = risks.filter((risk) => risk.status !== 'CLOSED');
+      return {
+        activeUsers,
+        recentActivity: asRecords(recentActivity),
+        metrics,
+        objectives: {
+          total: objectives._count.id,
+          averageProgress: numeric(objectives._avg.progress),
+        },
+        kpis: Object.fromEntries(kpiGroups.map((group) => [group.status, group._count._all])),
+        initiatives: {
+          total: initiatives.length,
+          active: initiatives.filter((initiative) => initiative.status === 'ACTIVE').length,
+          delayed: initiatives.filter((initiative) => initiative.status === 'DELAYED').length,
+          atRisk: initiatives.filter((initiative) => initiative.status === 'AT_RISK').length,
+          completed: initiatives.filter((initiative) => initiative.status === 'COMPLETED').length,
+          plannedBudget: initiatives.reduce(
+            (total, initiative) => total + Number(initiative.budget),
+            0,
           ),
-        )
-        .slice(0, 10),
-    };
+          actualSpending: initiatives.reduce(
+            (total, initiative) => total + Number(initiative.actualSpending),
+            0,
+          ),
+        },
+        risks: {
+          open: riskOpen.length,
+          critical: riskOpen.filter((risk) => risk.residualScore >= 15).length,
+          averageResidualScore:
+            riskOpen.length === 0
+              ? null
+              : Math.round(
+                  (riskOpen.reduce((total, risk) => total + risk.residualScore, 0) /
+                    riskOpen.length) *
+                    100,
+                ) / 100,
+        },
+        alerts: asRecords(alerts),
+        upcomingDeadlines: asRecords([
+          ...initiativeDeadlines.map((deadline) => ({ ...deadline, module: 'initiatives' })),
+          ...treatmentDeadlines.map((deadline) => ({ ...deadline, module: 'risks' })),
+        ])
+          .sort((left, right) =>
+            String(left.endDate ?? left.dueDate).localeCompare(
+              String(right.endDate ?? right.dueDate),
+            ),
+          )
+          .slice(0, 10),
+      };
+    });
   }
 
   async deadlines(query: DeadlineQuery, now: Date, scope: DeadlineScope) {

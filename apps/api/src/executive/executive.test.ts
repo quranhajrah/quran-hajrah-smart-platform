@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { AnalysisStore } from '../analysis/store.js';
 import { createApp } from '../app.js';
 import type { AppConfig } from '../config.js';
 import type { DocumentStore } from '../documents/store.js';
@@ -8,6 +9,7 @@ import type { DocumentRecord } from '../documents/types.js';
 import type { IdentityStore } from '../identity/store.js';
 import { signAccessToken } from '../identity/security.js';
 import type { AuditEntry, IdentityUser, PublicRole, RefreshSession } from '../identity/types.js';
+import type { LogRecord, Logger } from '../logger.js';
 import type { ExecutiveRecord, ExecutiveStore } from './store.js';
 import type {
   AlertCandidate,
@@ -135,6 +137,7 @@ class MemoryIdentityStore implements IdentityStore {
 }
 
 const sourceDocuments: DocumentRecord[] = [];
+let documentDashboardCalls = 0;
 const documentStore: DocumentStore = {
   listCategories: async () => [],
   listOwningDepartments: async () => [],
@@ -159,17 +162,21 @@ const documentStore: DocumentStore = {
   listAudit: async () => ({ items: [], total: 0 }),
   createAudit: async () => undefined,
   hasAccessRule: async () => false,
-  dashboard: async () => ({
-    total: 0,
-    active: 0,
-    underReview: 0,
-    expiring: 0,
-    archived: 0,
-    recent: [],
-  }),
+  dashboard: async () => {
+    documentDashboardCalls += 1;
+    return {
+      total: 0,
+      active: 0,
+      underReview: 0,
+      expiring: 0,
+      archived: 0,
+      recent: [],
+    };
+  },
 };
 
 class MemoryExecutiveStore implements ExecutiveStore {
+  dashboardBaseCalls = 0;
   readonly records: Record<ExecutiveEntity, ExecutiveRecord[]> = {
     metrics: [],
     objectives: [],
@@ -346,6 +353,7 @@ class MemoryExecutiveStore implements ExecutiveStore {
   linkEvidence = async () => undefined;
 
   async dashboardBase(): Promise<ExecutiveDashboardBase> {
+    this.dashboardBaseCalls += 1;
     const initiatives = this.records.initiatives.filter((item) => !item.deletedAt);
     const risks = this.records.risks.filter((item) => !item.deletedAt);
     const scores = risks.map((item) => Number(item.residualScore)).filter(Number.isFinite);
@@ -548,6 +556,8 @@ describe('Enterprise 23 executive API', () => {
   let viewerToken: string;
   let metricOperatorToken: string;
   let queryOnlyToken: string;
+  let errorLogs: LogRecord[];
+  let logger: Logger;
 
   beforeEach(async () => {
     administrator = createUser('admin@example.test', createRole('super_admin', permissions));
@@ -558,9 +568,15 @@ describe('Enterprise 23 executive API', () => {
     );
     queryOnly = createUser('query@example.test', createRole('query_operator', ['executive.query']));
     sourceDocuments.length = 0;
+    documentDashboardCalls = 0;
+    errorLogs = [];
+    logger = {
+      info: () => undefined,
+      error: (record) => errorLogs.push(record),
+    };
     identityStore = new MemoryIdentityStore([administrator, viewer, metricOperator, queryOnly]);
     executiveStore = new MemoryExecutiveStore();
-    app = createApp({ store: identityStore, documentStore, executiveStore, config });
+    app = createApp({ store: identityStore, documentStore, executiveStore, config, logger });
     adminToken = await signAccessToken(administrator.id, config);
     viewerToken = await signAccessToken(viewer.id, config);
     metricOperatorToken = await signAccessToken(metricOperator.id, config);
@@ -595,7 +611,61 @@ describe('Enterprise 23 executive API', () => {
     expect(response.body.summary.activeUsers).toBe(2);
     expect(response.body.associationIndicators.beneficiaries_total).toBeNull();
     expect(response.body.health.score).toBeNull();
+    expect(executiveStore.dashboardBaseCalls).toBe(1);
+    expect(documentDashboardCalls).toBe(1);
     expect(response.body.health.missingData).toContain('الحوكمة');
+  });
+
+  it('logs an operation-scoped production diagnostic before returning INTERNAL_ERROR', async () => {
+    const databaseError = Object.assign(
+      new Error('Timed out fetching a new connection from postgresql://user:secret@db.test/app.'),
+      {
+        code: 'P2024',
+        clientVersion: '6.19.3',
+      },
+    );
+    const analysisStore = {
+      summary: async () => {
+        throw databaseError;
+      },
+    } as unknown as AnalysisStore;
+    const failureApp = createApp({
+      store: identityStore,
+      documentStore,
+      executiveStore,
+      analysisStore,
+      config: { ...config, nodeEnv: 'production', isProduction: true },
+      logger,
+    });
+
+    const response = await request(failureApp)
+      .get('/api/executive/dashboard')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Request-Id', 'dashboard-production-test');
+
+    expect(response.status).toBe(500);
+    expect(response.headers['x-request-id']).toBe('dashboard-production-test');
+    expect(response.body).toEqual({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'An unexpected error occurred.',
+      },
+    });
+    expect(errorLogs).toHaveLength(1);
+    expect(errorLogs[0]).toMatchObject({
+      event: 'executive_dashboard_failed',
+      requestId: 'dashboard-production-test',
+      failingOperation: 'executive.dashboard.document_analysis_summary',
+      originalError: {
+        name: 'Error',
+        code: 'P2024',
+        clientVersion: '6.19.3',
+      },
+    });
+    expect(String(errorLogs[0]?.stack)).toContain('ExecutiveDashboardOperationError');
+    expect(JSON.stringify(errorLogs[0])).not.toContain('user:secret');
+    expect(response.text).not.toContain('P2024');
+    expect(response.text).not.toContain('db.test');
   });
 
   it('records a metric measurement and an audit event', async () => {

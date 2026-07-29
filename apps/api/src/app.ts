@@ -201,7 +201,14 @@ export const createApp = (dependencies: AppDependencies = {}) => {
   );
   app.use(
     '/api',
-    createExecutiveRouter(store, documentStore, executiveStore, config, executiveAnalysisStore),
+    createExecutiveRouter(
+      store,
+      documentStore,
+      executiveStore,
+      config,
+      executiveAnalysisStore,
+      logger,
+    ),
   );
   app.use('/api', createKnowledgeRouter(store, knowledgeService, config));
   app.use('/api', createExecutiveAiRouter(store, executiveAiService, config));

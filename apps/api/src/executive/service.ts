@@ -18,12 +18,17 @@ import {
   riskHealthScore,
   validateHealthWeights,
 } from './calculations.js';
+import {
+  runExecutiveDashboardOperation,
+  runExecutiveDashboardOperationSync,
+} from './dashboard-diagnostics.js';
 import type { ExecutiveRecord, ExecutiveStore } from './store.js';
 import type {
   ExecutiveEntity,
   ExecutiveHealth,
   ExecutiveResponse,
   HealthInputs,
+  HealthWeights,
   PageQuery,
 } from './types.js';
 import type { AnalysisStore } from '../analysis/store.js';
@@ -57,6 +62,16 @@ const numeric = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const emptyDocumentAnalysisSummary = {
+  analyzed: 0,
+  awaitingReview: 0,
+  awaitingApproval: 0,
+  imported: 0,
+  failed: 0,
+  ocrRequired: 0,
+  budget: { records: 0, lines: 0, totalPlanned: 0 },
 };
 
 export class ExecutiveService {
@@ -259,92 +274,114 @@ export class ExecutiveService {
   }
 
   async dashboard(user: IdentityUser) {
-    const [base, documents, health, documentAnalysis] = await Promise.all([
-      this.store.dashboardBase(),
-      this.documentStore.dashboard({
+    const documentAccess = runExecutiveDashboardOperationSync(
+      'executive.dashboard.permission_scope',
+      () => ({
         userId: user.id,
         roleIds: user.roles.map((role) => role.id),
         allowedLevels: [...allowedConfidentialityLevels(user)],
       }),
-      this.health(user),
-      this.analysisStore?.summary() ??
-        Promise.resolve({
-          analyzed: 0,
-          awaitingReview: 0,
-          awaitingApproval: 0,
-          imported: 0,
-          failed: 0,
-          ocrRequired: 0,
-          budget: { records: 0, lines: 0, totalPlanned: 0 },
-        }),
-    ]);
-    const metrics = Object.fromEntries(
-      base.metrics.map((metric) => [
-        metric.key,
-        {
-          id: metric.id,
-          nameAr: metric.nameAr,
-          value: metric.currentNumericValue ?? metric.currentTextValue ?? null,
-          unit: metric.unit ?? null,
-          measuredAt: metric.currentMeasuredAt ?? null,
-        },
-      ]),
     );
-    return {
-      summary: {
-        documents: {
-          total: documents.total,
-          active: documents.active,
-          underReview: documents.underReview,
-          expiring: documents.expiring,
-          archived: documents.archived,
-        },
-        activeUsers: base.activeUsers,
-        recentSystemActivity: base.recentActivity.length,
-        objectives: base.objectives,
-        kpis: base.kpis,
-        initiatives: {
-          ...base.initiatives,
-          budgetVariance: calculateBudgetVariance(
-            base.initiatives.plannedBudget,
-            base.initiatives.actualSpending,
-          ),
-        },
-        risks: base.risks,
-      },
-      associationIndicators: Object.fromEntries(
-        associationMetricKeys.map((key) => [key, metrics[key] ?? null]),
+    const [base, documents, weights, documentAnalysis] = await Promise.all([
+      runExecutiveDashboardOperation('executive.dashboard.base', () => this.store.dashboardBase()),
+      runExecutiveDashboardOperation('executive.dashboard.documents', () =>
+        this.documentStore.dashboard(documentAccess),
       ),
-      institutionalMetrics: metrics,
-      health,
-      documentAnalysis,
-      recentDocuments: documents.recent,
-      recentActivities: base.recentActivity,
-      alerts: base.alerts,
-      upcomingDeadlines: base.upcomingDeadlines,
-      quickActions: [
-        'upload_document',
-        'add_kpi',
-        'add_initiative',
-        'add_risk',
-        'add_alert',
-        'create_report',
-        'knowledge_center',
-        'manage_users',
-      ],
-    };
+      runExecutiveDashboardOperation('executive.dashboard.health_weights', () =>
+        this.store.getHealthWeights(user.id),
+      ),
+      runExecutiveDashboardOperation(
+        'executive.dashboard.document_analysis_summary',
+        () => this.analysisStore?.summary() ?? emptyDocumentAnalysisSummary,
+      ),
+    ]);
+    const health = runExecutiveDashboardOperationSync(
+      'executive.dashboard.health_calculation',
+      () => this.calculateHealth(base, documents, weights),
+    );
+    return runExecutiveDashboardOperationSync('executive.dashboard.response_aggregation', () => {
+      const metrics = Object.fromEntries(
+        base.metrics.map((metric) => [
+          metric.key,
+          {
+            id: metric.id,
+            nameAr: metric.nameAr,
+            value: metric.currentNumericValue ?? metric.currentTextValue ?? null,
+            unit: metric.unit ?? null,
+            measuredAt: metric.currentMeasuredAt ?? null,
+          },
+        ]),
+      );
+      return {
+        summary: {
+          documents: {
+            total: documents.total,
+            active: documents.active,
+            underReview: documents.underReview,
+            expiring: documents.expiring,
+            archived: documents.archived,
+          },
+          activeUsers: base.activeUsers,
+          recentSystemActivity: base.recentActivity.length,
+          objectives: base.objectives,
+          kpis: base.kpis,
+          initiatives: {
+            ...base.initiatives,
+            budgetVariance: calculateBudgetVariance(
+              base.initiatives.plannedBudget,
+              base.initiatives.actualSpending,
+            ),
+          },
+          risks: base.risks,
+        },
+        associationIndicators: Object.fromEntries(
+          associationMetricKeys.map((key) => [key, metrics[key] ?? null]),
+        ),
+        institutionalMetrics: metrics,
+        health,
+        documentAnalysis,
+        recentDocuments: documents.recent,
+        recentActivities: base.recentActivity,
+        alerts: base.alerts,
+        upcomingDeadlines: base.upcomingDeadlines,
+        quickActions: [
+          'upload_document',
+          'add_kpi',
+          'add_initiative',
+          'add_risk',
+          'add_alert',
+          'create_report',
+          'knowledge_center',
+          'manage_users',
+        ],
+      };
+    });
   }
 
   async health(user: IdentityUser): Promise<ExecutiveHealth> {
     const [base, documents, weights] = await Promise.all([
-      this.store.dashboardBase(),
-      this.documentStore.dashboard({
-        userId: user.id,
-        roleIds: user.roles.map((role) => role.id),
-        allowedLevels: [...allowedConfidentialityLevels(user)],
-      }),
-      this.store.getHealthWeights(user.id),
+      runExecutiveDashboardOperation('executive.dashboard.base', () => this.store.dashboardBase()),
+      runExecutiveDashboardOperation('executive.dashboard.documents', () =>
+        this.documentStore.dashboard({
+          userId: user.id,
+          roleIds: user.roles.map((role) => role.id),
+          allowedLevels: [...allowedConfidentialityLevels(user)],
+        }),
+      ),
+      runExecutiveDashboardOperation('executive.dashboard.health_weights', () =>
+        this.store.getHealthWeights(user.id),
+      ),
     ]);
+    return runExecutiveDashboardOperationSync('executive.dashboard.health_calculation', () =>
+      this.calculateHealth(base, documents, weights),
+    );
+  }
+
+  private calculateHealth(
+    base: Awaited<ReturnType<ExecutiveStore['dashboardBase']>>,
+    documents: Awaited<ReturnType<DocumentStore['dashboard']>>,
+    weights: HealthWeights,
+  ): ExecutiveHealth {
     const metricValues = Object.fromEntries(
       base.metrics.map((metric) => [metric.key, metric.currentNumericValue ?? null]),
     );

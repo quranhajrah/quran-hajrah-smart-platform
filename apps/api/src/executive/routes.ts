@@ -3,10 +3,12 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import type { AppConfig } from '../config.js';
 import { asyncRoute, requireAuth, requirePermission, validate } from '../http.js';
+import type { Logger } from '../logger.js';
 import type { IdentityStore } from '../identity/store.js';
 import { permissionCodes } from '../identity/types.js';
 import type { DocumentStore } from '../documents/store.js';
 import { calculateBudgetVariance } from './calculations.js';
+import { executiveDashboardFailure } from './dashboard-diagnostics.js';
 import { ExecutiveService } from './service.js';
 import type { ExecutiveStore } from './store.js';
 import type { AnalysisStore } from '../analysis/store.js';
@@ -353,7 +355,8 @@ export const createExecutiveRouter = (
   documentStore: DocumentStore,
   executiveStore: ExecutiveStore,
   config: AppConfig,
-  analysisStore?: AnalysisStore,
+  analysisStore: AnalysisStore | undefined,
+  logger: Logger,
 ) => {
   const router = Router();
   const authenticated = requireAuth(identityStore, config);
@@ -369,9 +372,18 @@ export const createExecutiveRouter = (
   router.get(
     '/executive/dashboard',
     requirePermission('dashboard.view'),
-    asyncRoute(async (request, response) =>
-      response.json(await service.dashboard(request.identity!)),
-    ),
+    asyncRoute(async (request, response) => {
+      try {
+        response.json(await service.dashboard(request.identity!));
+      } catch (error) {
+        logger.error({
+          event: 'executive_dashboard_failed',
+          requestId: request.requestId,
+          ...executiveDashboardFailure(error),
+        });
+        throw error;
+      }
+    }),
   );
   router.get(
     '/executive/health',
