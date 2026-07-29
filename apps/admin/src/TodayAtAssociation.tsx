@@ -342,6 +342,12 @@ export function TodayAtAssociation() {
           <p>موجز يومي واقعي، مبني على الوحدات المتاحة والبيانات المصرح بها فقط.</p>
         </div>
         <div className="ex-page-actions">
+          <Link className="ex-secondary-link" to="/executive/command-center">
+            مركز القيادة
+          </Link>
+          <Link className="ex-secondary-link" to="/executive/leadership">
+            اللوحة القيادية
+          </Link>
           {pageFreshness && <FreshnessBadge timestamp={pageFreshness} failed={refreshFailed} />}
           <button type="button" disabled={refreshing} onClick={() => void load(true)}>
             {refreshing ? 'جارٍ التحديث…' : 'تحديث موجز اليوم'}

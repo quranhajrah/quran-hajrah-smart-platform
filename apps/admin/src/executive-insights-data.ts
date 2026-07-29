@@ -2,6 +2,7 @@ import {
   api,
   ApiRequestError,
   type AnalysisJob,
+  type ExecutiveHealth,
   type ExecutiveRecord,
   type PageResult,
 } from './api';
@@ -73,6 +74,29 @@ export type TodayData = {
   alerts: InsightResult<PageResult>;
   activity: InsightResult<PageResult>;
   analysisJobs: InsightResult<PageResult<AnalysisJob>>;
+};
+
+export type KnowledgeIndexSummary = {
+  indexedDocuments: number;
+  queuedDocuments: number;
+  failedDocuments: number;
+  chunkCount: number;
+  relationCount: number;
+};
+
+export type LeadershipData = {
+  dashboard: InsightResult<ExecutiveDashboardSnapshot>;
+  health: InsightResult<ExecutiveHealth>;
+  metrics: InsightResult<PageResult>;
+  objectives: InsightResult<PageResult>;
+  kpiSummary: InsightResult<Record<string, number>>;
+  kpis: InsightResult<PageResult>;
+  initiatives: InsightResult<PageResult>;
+  risks: InsightResult<PageResult>;
+  riskMatrix: InsightResult<RiskHeatMatrixData>;
+  criticalRisks: InsightResult<PageResult>;
+  knowledge: InsightResult<KnowledgeIndexSummary>;
+  reports: InsightResult<PageResult>;
 };
 
 type CacheEntry = {
@@ -321,6 +345,120 @@ export async function loadTodayData(
     ),
   ]);
   return { dashboard, deadlines, alerts, activity, analysisJobs };
+}
+
+export async function loadLeadershipData(
+  userId: string,
+  permissions: string[],
+  options: { force?: boolean } = {},
+): Promise<LeadershipData> {
+  const force = Boolean(options.force);
+  const [
+    dashboard,
+    health,
+    metrics,
+    objectives,
+    kpiSummary,
+    kpis,
+    initiatives,
+    risks,
+    riskMatrix,
+    criticalRisks,
+    knowledge,
+    reports,
+  ] = await Promise.all([
+    loadDashboardResult(userId, force),
+    safeLoad(has(permissions, 'dashboard.view'), 'تفاصيل الصحة المؤسسية', () =>
+      loadQuery<ExecutiveHealth>(userId, 'leadership-health', '/executive/health', force),
+    ),
+    safeLoad(has(permissions, 'metrics.view'), 'المؤشرات المؤسسية', () =>
+      loadAllPages(userId, 'leadership-metrics', '/executive/metrics', force),
+    ),
+    safeLoad(has(permissions, 'strategy.view'), 'محفظة الأهداف', () =>
+      loadAllPages(userId, 'leadership-objectives', '/executive/objectives', force),
+    ),
+    safeLoad(has(permissions, 'kpi.view'), 'توزيع مؤشرات الأداء', () =>
+      loadQuery<Record<string, number>>(
+        userId,
+        'leadership-kpi-summary',
+        '/executive/kpis/summary',
+        force,
+      ),
+    ),
+    safeLoad(has(permissions, 'kpi.view'), 'سجل مؤشرات الأداء', () =>
+      loadAllPages(userId, 'leadership-kpis', '/executive/kpis', force),
+    ),
+    safeLoad(has(permissions, 'initiatives.view'), 'محفظة المبادرات', () =>
+      loadAllPages(userId, 'leadership-initiatives', '/executive/initiatives', force),
+    ),
+    safeLoad(has(permissions, 'risks.view'), 'سجل المخاطر', () =>
+      loadAllPages(userId, 'leadership-risks', '/executive/risks', force),
+    ),
+    safeLoad(has(permissions, 'risks.view'), 'مصفوفة المخاطر المتبقية', () =>
+      loadQuery<RiskHeatMatrixData>(
+        userId,
+        'risk-heat-matrix',
+        '/executive/risks/heat-matrix',
+        force,
+      ),
+    ),
+    safeLoad(has(permissions, 'risks.view'), 'المخاطر الحرجة', () =>
+      loadAllPages(userId, 'critical-risks', '/executive/risks/critical', force),
+    ),
+    safeLoad(has(permissions, 'knowledge.search'), 'تغطية الفهرس المعرفي', () =>
+      loadQuery<KnowledgeIndexSummary>(
+        userId,
+        'leadership-knowledge-summary',
+        '/knowledge/summary',
+        force,
+      ),
+    ),
+    safeLoad(has(permissions, 'reports.view'), 'مسار التقارير التنفيذية', () =>
+      loadAllPages(userId, 'leadership-reports', '/executive/reports', force),
+    ),
+  ]);
+
+  return {
+    dashboard,
+    health,
+    metrics,
+    objectives,
+    kpiSummary,
+    kpis,
+    initiatives,
+    risks,
+    riskMatrix,
+    criticalRisks,
+    knowledge,
+    reports,
+  };
+}
+
+export function loadMetricTrend(userId: string, metricId: string, force = false) {
+  return loadQuery<PageResult>(
+    userId,
+    `leadership-metric-trend-${metricId}`,
+    `/executive/metrics/${metricId}/trend?page=1&pageSize=6`,
+    force,
+  );
+}
+
+export function loadRiskTrend(userId: string, force = false) {
+  return loadQuery<ExecutiveRecord[]>(
+    userId,
+    'leadership-risk-trend',
+    '/executive/risks/trend',
+    force,
+  );
+}
+
+export async function createExecutiveHealthSnapshot() {
+  const snapshot = await api<ExecutiveRecord>('/executive/health/snapshots', {
+    method: 'POST',
+  });
+  invalidateExecutiveInsightQueries('leadership-health');
+  clearExecutiveDashboardCache();
+  return snapshot;
 }
 
 export function loadExecutiveActivityPage(userId: string, page: number, force = false) {

@@ -1,6 +1,6 @@
 import { AppError } from '../http.js';
 import type { IdentityStore } from '../identity/store.js';
-import type { IdentityUser, RequestMeta } from '../identity/types.js';
+import { permissionCodes, type IdentityUser, type RequestMeta } from '../identity/types.js';
 import {
   allowedConfidentialityLevels,
   canAccessDocument,
@@ -527,15 +527,29 @@ export class ExecutiveService {
 
   async structuredQuery(text: string, user: IdentityUser): Promise<ExecutiveResponse> {
     const normalized = text.normalize('NFC').trim();
+    const permissions = new Set(permissionCodes(user));
+    const requireDomain = (permission: string) => {
+      if (!permissions.has(permission)) {
+        throw new AppError(403, 'لا تملك صلاحية الاطلاع على نطاق البيانات المطلوب.', 'FORBIDDEN');
+      }
+    };
     if (/متعثر|مؤشرات الأداء/.test(normalized)) {
+      requireDomain('kpi.view');
       const result = await this.store.list('kpis', {
         page: 1,
         pageSize: 20,
         status: 'AT_RISK,OFF_TRACK',
       });
-      return this.response('مؤشرات الأداء المتعثرة', result.items, 'kpi', '/executive/kpis');
+      return this.response(
+        'مؤشرات الأداء المتعثرة',
+        result.items,
+        'kpi',
+        '/executive/kpis',
+        'kpi.view',
+      );
     }
     if (/المبادرات المتأخرة|متأخر/.test(normalized)) {
+      requireDomain('initiatives.view');
       const result = await this.store.list('initiatives', {
         page: 1,
         pageSize: 20,
@@ -546,17 +560,26 @@ export class ExecutiveService {
         result.items,
         'initiatives',
         '/executive/initiatives',
+        'initiatives.view',
       );
     }
     if (/المخاطر الحرجة|حرج/.test(normalized)) {
+      requireDomain('risks.view');
       const result = await this.store.list('risks', {
         page: 1,
         pageSize: 20,
         status: 'critical',
       });
-      return this.response('المخاطر الحرجة', result.items, 'risks', '/executive/risks');
+      return this.response(
+        'المخاطر الحرجة',
+        result.items,
+        'risks',
+        '/executive/risks',
+        'risks.view',
+      );
     }
     if (/الوثائق.*ستنتهي|تنتهي/.test(normalized)) {
+      requireDomain('documents.view');
       const documents = await this.documentStore.dashboard({
         userId: user.id,
         roleIds: user.roles.map((role) => role.id),
@@ -574,7 +597,33 @@ export class ExecutiveService {
         ],
       };
     }
+    if (/حالة الوثائق|ملخص الوثائق|الوثائق المؤسسية/.test(normalized)) {
+      requireDomain('documents.view');
+      const documents = await this.documentStore.dashboard({
+        userId: user.id,
+        roleIds: user.roles.map((role) => role.id),
+        allowedLevels: [...allowedConfidentialityLevels(user)],
+      });
+      return {
+        mode: 'structured-data',
+        title: 'حالة الوثائق المؤسسية المرئية',
+        summary: `إجمالي الوثائق المصرح بها: ${documents.total}.`,
+        data: {
+          total: documents.total,
+          active: documents.active,
+          underReview: documents.underReview,
+          expiring: documents.expiring,
+          archived: documents.archived,
+        },
+        missingData: [],
+        sources: [{ module: 'knowledge-center', label: 'مركز المعرفة', route: '/documents' }],
+        suggestedActions: [
+          { label: 'فتح مركز المعرفة', route: '/documents', permission: 'documents.view' },
+        ],
+      };
+    }
     if (/نسبة تنفيذ الخطة|تنفيذ الخطة/.test(normalized)) {
+      requireDomain('metrics.view');
       const metrics = await this.store.metricSummaries();
       const selected = metrics.filter((metric) =>
         ['strategic_plan_progress', 'operational_plan_progress'].includes(metric.key),
@@ -584,9 +633,22 @@ export class ExecutiveService {
         selected as unknown as ExecutiveRecord[],
         'metrics',
         '/executive/metrics',
+        'metrics.view',
+      );
+    }
+    if (/المؤشرات المؤسسية|القياسات المؤسسية/.test(normalized)) {
+      requireDomain('metrics.view');
+      const metrics = await this.store.metricSummaries();
+      return this.response(
+        'المؤشرات المؤسسية المعتمدة',
+        metrics as unknown as ExecutiveRecord[],
+        'metrics',
+        '/executive/metrics',
+        'metrics.view',
       );
     }
     if (/ملخص.*تنفيذي|ملخصًا تنفيذيًا/.test(normalized)) {
+      requireDomain('dashboard.view');
       const dashboard = await this.dashboard(user);
       return {
         mode: 'structured-data',
@@ -635,6 +697,7 @@ export class ExecutiveService {
     items: ExecutiveRecord[],
     module: string,
     route: string,
+    permission?: string,
   ): ExecutiveResponse {
     return {
       mode: 'structured-data',
@@ -651,7 +714,7 @@ export class ExecutiveService {
         label: String(item.title ?? item.name ?? item.nameAr ?? item.code ?? item.id),
         route,
       })),
-      suggestedActions: [{ label: `فتح ${title}`, route }],
+      suggestedActions: [{ label: `فتح ${title}`, route, permission }],
     };
   }
 

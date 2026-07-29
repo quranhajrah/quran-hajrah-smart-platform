@@ -458,7 +458,7 @@ describe('Sprint 1B executive command center and today view', () => {
     renderRoute('/executive/today', ['dashboard.view']);
     expect(await screen.findByRole('heading', { name: 'اليوم في الجمعية' })).toBeTruthy();
     expect(screen.getAllByText('مركز القيادة التنفيذي').length).toBeGreaterThan(0);
-    expect(screen.queryByText('لوحة القيادة القيادية')).toBeNull();
+    expect(screen.getAllByText('لوحة القيادة القيادية').length).toBeGreaterThan(0);
   });
 
   it('omits restricted exception counts and makes one dashboard aggregate request', async () => {

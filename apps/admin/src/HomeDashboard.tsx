@@ -419,6 +419,9 @@ export function HomeDashboard() {
           <p>قراءة مركزة للحالة المؤسسية والأولويات والمواعيد وفق البيانات المعتمدة.</p>
         </div>
         <div className="ex-page-actions">
+          <Link className="ex-secondary-link" to="/executive/leadership">
+            اللوحة القيادية
+          </Link>
           <FreshnessBadge timestamp={snapshot.loadedAt} failed={refreshFailed} />
           <button type="button" disabled={refreshing} onClick={() => void load(true)}>
             {refreshing ? 'جارٍ التحديث…' : 'تحديث البيانات'}

@@ -477,6 +477,9 @@ export function ExecutiveCommandCenter() {
           <p>يعرض فقط ما يتطلب تدخل القيادة، وفق السجلات والصلاحيات المعتمدة.</p>
         </div>
         <div className="ex-page-actions">
+          <Link className="ex-secondary-link" to="/executive/leadership">
+            اللوحة القيادية
+          </Link>
           {loadedAt && <FreshnessBadge timestamp={loadedAt} failed={refreshFailed} />}
           <button type="button" disabled={refreshing} onClick={() => void load(true)}>
             {refreshing ? 'جارٍ التحديث…' : 'تحديث المركز'}

@@ -543,9 +543,11 @@ describe('Enterprise 23 executive API', () => {
   let administrator: IdentityUser;
   let viewer: IdentityUser;
   let metricOperator: IdentityUser;
+  let queryOnly: IdentityUser;
   let adminToken: string;
   let viewerToken: string;
   let metricOperatorToken: string;
+  let queryOnlyToken: string;
 
   beforeEach(async () => {
     administrator = createUser('admin@example.test', createRole('super_admin', permissions));
@@ -554,13 +556,15 @@ describe('Enterprise 23 executive API', () => {
       'operator@example.test',
       createRole('employee', ['metrics.view', 'metrics.measure']),
     );
+    queryOnly = createUser('query@example.test', createRole('query_operator', ['executive.query']));
     sourceDocuments.length = 0;
-    identityStore = new MemoryIdentityStore([administrator, viewer, metricOperator]);
+    identityStore = new MemoryIdentityStore([administrator, viewer, metricOperator, queryOnly]);
     executiveStore = new MemoryExecutiveStore();
     app = createApp({ store: identityStore, documentStore, executiveStore, config });
     adminToken = await signAccessToken(administrator.id, config);
     viewerToken = await signAccessToken(viewer.id, config);
     metricOperatorToken = await signAccessToken(metricOperator.id, config);
+    queryOnlyToken = await signAccessToken(queryOnly.id, config);
   });
 
   const admin = (method: 'get' | 'post' | 'patch' | 'delete', path: string) =>
@@ -823,6 +827,23 @@ describe('Enterprise 23 executive API', () => {
     expect(response.body.mode).toBe('structured-data');
     expect(response.body.data).toHaveLength(1);
     expect(identityStore.audits.at(-1)?.metadata).not.toHaveProperty('text');
+  });
+
+  it('rechecks structured-query domain permissions before reading records', async () => {
+    executiveStore.records.risks.push({
+      id: randomUUID(),
+      code: 'R-RESTRICTED',
+      title: 'مخاطر لا يصرح لمشغل الاستعلام برؤيتها',
+      status: 'OPEN',
+      residualScore: 20,
+    });
+    const response = await request(app)
+      .post('/api/executive/query')
+      .set('Authorization', `Bearer ${queryOnlyToken}`)
+      .send({ text: 'ما المخاطر الحرجة؟' });
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('FORBIDDEN');
+    expect(response.text).not.toContain('R-RESTRICTED');
   });
 
   it('generates reports and protects approval with a distinct permission', async () => {

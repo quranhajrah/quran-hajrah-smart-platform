@@ -19,6 +19,7 @@ import { ExecutiveShell } from './ExecutiveFoundation';
 import { HomeDashboard } from './HomeDashboard';
 import { ExecutiveCommandCenter } from './ExecutiveCommandCenter';
 import { TodayAtAssociation } from './TodayAtAssociation';
+import { ExecutiveLeadership } from './ExecutiveLeadership';
 
 function Guard({ children, permission }: { children: ReactNode; permission?: string }) {
   const { user, loading, can } = useAuth();
@@ -327,6 +328,14 @@ export default function App() {
             element={
               <ProtectedPage permission="dashboard.view">
                 <TodayAtAssociation />
+              </ProtectedPage>
+            }
+          />
+          <Route
+            path="/executive/leadership"
+            element={
+              <ProtectedPage permission="dashboard.view">
+                <ExecutiveLeadership />
               </ProtectedPage>
             }
           />

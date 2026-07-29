@@ -3,12 +3,31 @@ import {
   useMemo,
   useRef,
   useState,
+  type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
+import { ApiRequestError } from './api';
 import { useAuth } from './auth';
 import { Link, NavLink, useNavigate } from './router';
+import {
+  answerFromInstitutionalKnowledge,
+  executiveWritingDefinitions,
+  generateSmartBarWriting,
+  loadExecutiveAiCapabilities,
+  runStructuredExecutiveQuery,
+  searchInstitutionalKnowledge,
+  structuredRecords,
+  type ExecutiveAiCapabilities,
+  type ExecutiveStructuredQueryResult,
+  type ExecutiveWritingDefinition,
+  type KnowledgeAnswer,
+  type KnowledgeSearchItem,
+} from './executive-smartbar-data';
+import type { ExecutiveAiWritingResponse } from './executive-insights-data';
+import { WritingResult } from './ExecutiveWritingResult';
 import './executive-foundation.css';
+import './executive-sprint1c.css';
 
 type NavigationItem = {
   to: string;
@@ -47,6 +66,13 @@ const executiveNavigationGroups: NavigationGroup[] = [
         description: 'الموجز التنفيذي اليومي',
         permission: 'dashboard.view',
         keywords: ['اليوم', 'موجز', 'متابعة', 'استحقاقات'],
+      },
+      {
+        to: '/executive/leadership',
+        label: 'لوحة القيادة القيادية',
+        description: 'الصحة والتقدم والأثر والتقارير',
+        permission: 'dashboard.view',
+        keywords: ['قيادة', 'رئيس تنفيذي', 'أهداف', 'أثر', 'تقارير'],
       },
       {
         to: '/executive/health',
@@ -252,9 +278,11 @@ export function ExecutiveSidebar({ open, onClose }: { open: boolean; onClose(): 
 export function ExecutiveHeader({
   onOpenSidebar,
   onOpenSmartBar,
+  smartBarAvailable,
 }: {
   onOpenSidebar(): void;
   onOpenSmartBar(): void;
+  smartBarAvailable: boolean;
 }) {
   const { user, logout } = useAuth();
   const date = new Intl.DateTimeFormat('ar-SA', {
@@ -278,16 +306,18 @@ export function ExecutiveHeader({
         <small>{date}</small>
         <strong>مرحبًا، {user?.fullName}</strong>
       </div>
-      <button
-        className="ex-smart-trigger"
-        type="button"
-        onClick={onOpenSmartBar}
-        aria-label="فتح شريط الانتقال التنفيذي"
-      >
-        <span aria-hidden="true">⌕</span>
-        <span>انتقل إلى صفحة أو أداة</span>
-        <kbd>⌘ / Ctrl + K</kbd>
-      </button>
+      {smartBarAvailable && (
+        <button
+          className="ex-smart-trigger"
+          type="button"
+          onClick={onOpenSmartBar}
+          aria-label="فتح الشريط التنفيذي الذكي"
+        >
+          <span aria-hidden="true">⌕</span>
+          <span>تنقل، استعلم، وابحث أو اكتب</span>
+          <kbd>⌘ / Ctrl + K</kbd>
+        </button>
+      )}
       <button className="ex-header-signout" type="button" onClick={() => void logout()}>
         تسجيل الخروج
       </button>
@@ -295,12 +325,411 @@ export function ExecutiveHeader({
   );
 }
 
+type SmartBarMode = 'navigation' | 'structured' | 'knowledge' | 'writing';
+
+const smartBarModeDefinitions: Array<{
+  key: SmartBarMode;
+  label: string;
+  permission?: string;
+}> = [
+  { key: 'navigation', label: 'التنقل' },
+  { key: 'structured', label: 'استعلام مؤسسي', permission: 'executive.query' },
+  { key: 'knowledge', label: 'المعرفة والأدلة' },
+  { key: 'writing', label: 'الكتابة التنفيذية', permission: 'executive_ai.use' },
+];
+
+const smartBarError = (error: unknown, fallback: string) =>
+  error instanceof ApiRequestError && error.message ? error.message : fallback;
+
+const structuredFactLabels: Record<string, string> = {
+  total: 'الإجمالي',
+  active: 'نشط',
+  underReview: 'قيد المراجعة',
+  expiring: 'قريب الانتهاء',
+  archived: 'مؤرشف',
+  open: 'مفتوح',
+  critical: 'حرج',
+  delayed: 'متأخر',
+  atRisk: 'معرض للخطر',
+  completed: 'مكتمل',
+  plannedBudget: 'الموازنة المخططة للمبادرات',
+  actualSpending: 'الإنفاق الفعلي للمبادرات',
+  coverage: 'التغطية',
+  score: 'الدرجة',
+  rating: 'التقييم',
+  averageProgress: 'متوسط التقدم',
+  averageResidualScore: 'متوسط الدرجة المتبقية',
+};
+
+const collectStructuredFacts = (
+  value: unknown,
+  facts: Array<{ label: string; value: string }>,
+  depth = 0,
+  parent = '',
+) => {
+  if (facts.length >= 14 || depth > 3 || !value || typeof value !== 'object') return facts;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (facts.length >= 14) break;
+    const label = structuredFactLabels[key] ?? (parent ? `${parent} — ${key}` : key);
+    if (typeof item === 'number' || typeof item === 'string') {
+      facts.push({ label, value: typeof item === 'number' ? item.toLocaleString('ar-SA') : item });
+    } else if (item && typeof item === 'object' && !Array.isArray(item)) {
+      collectStructuredFacts(item, facts, depth + 1, structuredFactLabels[key] ?? label);
+    }
+  }
+  return facts;
+};
+
+export function SmartBarModeSelector({
+  modes,
+  value,
+  onChange,
+}: {
+  modes: Array<{ key: SmartBarMode; label: string }>;
+  value: SmartBarMode;
+  onChange(mode: SmartBarMode): void;
+}) {
+  return (
+    <div className="ex-smartbar-modes" role="tablist" aria-label="أوضاع الشريط التنفيذي">
+      {modes.map((mode) => (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={value === mode.key}
+          className={value === mode.key ? 'is-active' : ''}
+          onClick={() => onChange(mode.key)}
+          key={mode.key}
+        >
+          {mode.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function StructuredQueryResult({
+  result,
+  receivedAt,
+  can,
+}: {
+  result: ExecutiveStructuredQueryResult;
+  receivedAt: string;
+  can(permission: string): boolean;
+}) {
+  const records = structuredRecords(result.data);
+  const facts = records.length === 0 ? collectStructuredFacts(result.data, []) : [];
+  return (
+    <section className="ex-smart-result" aria-live="polite">
+      <header>
+        <div>
+          <small>إجابة منظمة من السجلات الحالية</small>
+          <h3>{result.title}</h3>
+        </div>
+        <FreshnessBadge timestamp={receivedAt} />
+      </header>
+      <p>{result.summary}</p>
+      {records.length > 0 && (
+        <div className="ex-smart-records" role="list">
+          {records.slice(0, 10).map((record) => {
+            const source = result.sources.find((item) => item.recordId === record.id);
+            const label = String(
+              record.title ??
+                record.name ??
+                record.nameAr ??
+                record.code ??
+                source?.label ??
+                record.id,
+            );
+            const content = (
+              <>
+                <strong>{label}</strong>
+                <span>
+                  {record.status ? String(record.status).replaceAll('_', ' ') : 'سجل مؤسسي'}
+                </span>
+              </>
+            );
+            return source?.route ? (
+              <Link
+                role="listitem"
+                to={`${source.route}/${record.id}`}
+                key={record.id}
+                onClick={(event) => event.stopPropagation()}
+              >
+                {content}
+              </Link>
+            ) : (
+              <article role="listitem" key={record.id}>
+                {content}
+              </article>
+            );
+          })}
+        </div>
+      )}
+      {facts.length > 0 && (
+        <dl className="ex-smart-facts">
+          {facts.map((fact) => (
+            <div key={`${fact.label}-${fact.value}`}>
+              <dt>{fact.label}</dt>
+              <dd>{fact.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <div className="ex-smart-result-sources">
+        <h4>المصادر</h4>
+        <ul>
+          {result.sources.map((source) => (
+            <li key={`${source.module}-${source.recordId ?? source.label}`}>
+              {source.route ? <Link to={source.route}>{source.label}</Link> : source.label}
+              <span>{source.module}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="ex-smart-limitations">
+        <h4>التغطية والحدود</h4>
+        {result.missingData.length === 0 ? (
+          <p>لا تسجل الاستجابة مكونات مفقودة ضمن نطاق السؤال المدعوم.</p>
+        ) : (
+          <ul>
+            {result.missingData.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        )}
+        <small>وقت الاستعلام: {new Date(receivedAt).toLocaleString('ar-SA')}</small>
+      </div>
+      <nav className="ex-smart-actions" aria-label="الإجراءات المقترحة المحكومة">
+        {result.suggestedActions
+          .filter((action) => !action.permission || can(action.permission))
+          .map((action) => (
+            <Link to={action.route} key={`${action.route}-${action.label}`}>
+              {action.label}
+            </Link>
+          ))}
+      </nav>
+    </section>
+  );
+}
+
+export function KnowledgeAnswerResult({
+  answer,
+  searchItems,
+}: {
+  answer: KnowledgeAnswer | null;
+  searchItems: KnowledgeSearchItem[];
+}) {
+  if (!answer && searchItems.length === 0) return null;
+  const sources = answer?.sources ?? searchItems;
+  return (
+    <section className="ex-smart-result ex-knowledge-result" aria-live="polite">
+      {answer && (
+        <>
+          <header>
+            <div>
+              <small>Enterprise 25 — إجابة مستندة إلى الأدلة</small>
+              <h3>{answer.status === 'ANSWERED' ? 'الإجابة المعرفية' : 'الأدلة غير كافية'}</h3>
+            </div>
+            <span>{answer.sources.length.toLocaleString('ar-SA')} مصدر</span>
+          </header>
+          <p className="ex-knowledge-answer-prose">{answer.answer}</p>
+        </>
+      )}
+      <div className="ex-knowledge-evidence">
+        <h4>{answer ? 'الأدلة والاقتباسات المنفصلة' : 'نتائج البحث في الأدلة'}</h4>
+        {sources.map((source) => (
+          <article key={`${source.documentVersionId}-${source.pageNumber ?? 0}`}>
+            <header>
+              <Link to={source.sourceUrl}>{source.documentTitle}</Link>
+              <span>الصلة {(source.score * 100).toFixed(0)}٪</span>
+            </header>
+            <blockquote>{source.excerpt}</blockquote>
+            <footer>
+              الإصدار {source.versionNumber}
+              {source.pageNumber ? ` · الصفحة ${source.pageNumber}` : ''}
+              {source.section ? ` · ${source.section}` : ''}
+              {source.owningDepartment ? ` · ${source.owningDepartment}` : ''}
+            </footer>
+          </article>
+        ))}
+      </div>
+      {answer && (
+        <div className="ex-smart-limitations">
+          <h4>التغطية والحدود</h4>
+          {answer.limitations.length === 0 ? (
+            <p>لم تسجل الخدمة حدودًا إضافية لهذه الإجابة.</p>
+          ) : (
+            <ul>
+              {answer.limitations.map((limitation) => (
+                <li key={limitation}>{limitation}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function ExecutiveWritingForm({
+  definitions,
+}: {
+  definitions: ExecutiveWritingDefinition[];
+}) {
+  const [capability, setCapability] = useState(definitions[0]?.capability ?? 'QUESTION');
+  const [question, setQuestion] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [subject, setSubject] = useState('');
+  const [result, setResult] = useState<ExecutiveAiWritingResponse | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const definition =
+    definitions.find((item) => item.capability === capability) ?? definitions[0] ?? null;
+
+  useEffect(() => {
+    if (!definitions.some((item) => item.capability === capability) && definitions[0]) {
+      setCapability(definitions[0].capability);
+    }
+  }, [capability, definitions]);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!definition) return;
+    setBusy(true);
+    setError('');
+    try {
+      setResult(
+        await generateSmartBarWriting(definition, {
+          question: question.trim(),
+          recipient: recipient.trim(),
+          subject: subject.trim(),
+        }),
+      );
+    } catch (failure) {
+      setError(
+        smartBarError(failure, 'تعذر إنشاء الصياغة. بقيت جميع المدخلات محفوظة لإعادة المحاولة.'),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!definition) {
+    return (
+      <ExecutiveEmptyState
+        title="لا توجد صيغة كتابة متاحة"
+        description="لا تتضمن صلاحياتك الحالية أي صيغة أعادتها واجهة القدرات."
+        compact
+      />
+    );
+  }
+
+  return (
+    <div className="ex-smart-writing">
+      <form onSubmit={(event) => void submit(event)}>
+        <label>
+          <span>نمط وصيغة الكتابة المهنية</span>
+          <select
+            value={definition.capability}
+            onChange={(event) => setCapability(event.target.value as typeof capability)}
+          >
+            {definitions.map((item) => (
+              <option value={item.capability} key={item.capability}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {definition.needsRecipient && (
+          <div className="ex-smart-writing-context">
+            <label>
+              <span>الجهة أو المستلم</span>
+              <input
+                value={recipient}
+                onChange={(event) => setRecipient(event.target.value)}
+                minLength={2}
+                maxLength={160}
+                required
+              />
+            </label>
+            <label>
+              <span>موضوع الخطاب</span>
+              <input
+                value={subject}
+                onChange={(event) => setSubject(event.target.value)}
+                minLength={2}
+                maxLength={240}
+                required
+              />
+            </label>
+          </div>
+        )}
+        <label>
+          <span>الموضوع والسياق التنفيذي</span>
+          <textarea
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            minLength={2}
+            maxLength={1200}
+            rows={4}
+            required
+          />
+        </label>
+        <button type="submit" disabled={busy}>
+          {busy ? 'جارٍ فهم المراجع وإعادة الصياغة…' : `إنشاء ${definition.label}`}
+        </button>
+        <small>الإنشاء صريح عند الطلب، ولا تُدمج الاقتباسات داخل الصياغة المهنية.</small>
+      </form>
+      {error && (
+        <div className="ex-smartbar-error" role="alert">
+          {error}
+        </div>
+      )}
+      {result && <WritingResult result={result} allowFullCopy />}
+    </div>
+  );
+}
+
 export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose(): void }) {
   const { can } = useAuth();
   const navigate = useNavigate();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const navigationInputRef = useRef<HTMLInputElement>(null);
+  const modeInputRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<SmartBarMode>('navigation');
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [structuredInput, setStructuredInput] = useState('');
+  const [structuredResult, setStructuredResult] = useState<ExecutiveStructuredQueryResult | null>(
+    null,
+  );
+  const [structuredReceivedAt, setStructuredReceivedAt] = useState('');
+  const [structuredError, setStructuredError] = useState('');
+  const [structuredBusy, setStructuredBusy] = useState(false);
+  const [knowledgeInput, setKnowledgeInput] = useState('');
+  const [knowledgeAction, setKnowledgeAction] = useState<'search' | 'answer'>(
+    can('knowledge.ask') ? 'answer' : 'search',
+  );
+  const [knowledgeSearchItems, setKnowledgeSearchItems] = useState<KnowledgeSearchItem[]>([]);
+  const [knowledgeAnswer, setKnowledgeAnswer] = useState<KnowledgeAnswer | null>(null);
+  const [knowledgeError, setKnowledgeError] = useState('');
+  const [knowledgeBusy, setKnowledgeBusy] = useState(false);
+  const [capabilities, setCapabilities] = useState<ExecutiveAiCapabilities | null>(null);
+  const [capabilityError, setCapabilityError] = useState('');
+  const [capabilityBusy, setCapabilityBusy] = useState(false);
+
+  const availableModes = useMemo(
+    () =>
+      smartBarModeDefinitions.filter((candidate) => {
+        if (candidate.key === 'navigation') {
+          return navigationItems.some((item) => item.permission && can(item.permission));
+        }
+        if (candidate.key === 'knowledge') {
+          return can('knowledge.search') || can('knowledge.ask');
+        }
+        return !candidate.permission || can(candidate.permission);
+      }),
+    [can],
+  );
 
   const results = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('ar');
@@ -312,17 +741,24 @@ export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose():
           value.toLocaleLowerCase('ar').includes(normalized),
         );
       })
-      .slice(0, 9);
+      .slice(0, 10);
   }, [can, query]);
+
+  const writingDefinitions = useMemo(
+    () =>
+      executiveWritingDefinitions.filter(
+        (definition) =>
+          capabilities?.modes.includes(definition.capability) && can(definition.permission),
+      ),
+    [can, capabilities],
+  );
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
         event.preventDefault();
-        onClose();
-        if (!open) {
-          window.dispatchEvent(new CustomEvent('executive-smartbar-open'));
-        }
+        if (open) onClose();
+        else window.dispatchEvent(new CustomEvent('executive-smartbar-open'));
       }
       if (event.key === 'Escape' && open) onClose();
     };
@@ -332,16 +768,55 @@ export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose():
 
   useEffect(() => {
     if (!open) {
+      setMode('navigation');
       setQuery('');
       setActiveIndex(0);
+      setStructuredInput('');
+      setStructuredResult(null);
+      setStructuredError('');
+      setKnowledgeInput('');
+      setKnowledgeSearchItems([]);
+      setKnowledgeAnswer(null);
+      setKnowledgeError('');
+      setCapabilities(null);
+      setCapabilityError('');
       return;
     }
-    window.setTimeout(() => inputRef.current?.focus(), 0);
+    window.setTimeout(() => navigationInputRef.current?.focus(), 0);
   }, [open]);
 
-  useEffect(() => setActiveIndex(0), [query]);
+  useEffect(() => {
+    if (!availableModes.some((candidate) => candidate.key === mode)) {
+      setMode(availableModes[0]?.key ?? 'navigation');
+    }
+  }, [availableModes, mode]);
 
-  if (!open) return null;
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.setTimeout(() => {
+      if (mode === 'navigation') navigationInputRef.current?.focus();
+      else modeInputRef.current?.focus();
+    }, 0);
+  }, [mode, open]);
+
+  useEffect(() => {
+    if (!open || mode !== 'writing' || capabilities || capabilityBusy || capabilityError) return;
+    setCapabilityBusy(true);
+    void loadExecutiveAiCapabilities()
+      .then(setCapabilities)
+      .catch((error: unknown) =>
+        setCapabilityError(
+          smartBarError(error, 'تعذر تحميل صيغ الكتابة المتاحة. أعد المحاولة لاحقًا.'),
+        ),
+      )
+      .finally(() => setCapabilityBusy(false));
+  }, [capabilities, capabilityBusy, capabilityError, mode, open]);
+
+  if (!open || availableModes.length === 0) return null;
 
   const choose = (item: NavigationItem) => {
     navigate(item.to);
@@ -363,10 +838,48 @@ export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose():
     }
   };
 
+  const submitStructured = async (event: FormEvent) => {
+    event.preventDefault();
+    setStructuredBusy(true);
+    setStructuredError('');
+    try {
+      setStructuredResult(await runStructuredExecutiveQuery(structuredInput.trim()));
+      setStructuredReceivedAt(new Date().toISOString());
+    } catch (error) {
+      setStructuredError(
+        smartBarError(error, 'تعذر تنفيذ الاستعلام المؤسسي. بقي السؤال محفوظًا لإعادة المحاولة.'),
+      );
+    } finally {
+      setStructuredBusy(false);
+    }
+  };
+
+  const submitKnowledge = async (event: FormEvent) => {
+    event.preventDefault();
+    setKnowledgeBusy(true);
+    setKnowledgeError('');
+    try {
+      if (knowledgeAction === 'search') {
+        const response = await searchInstitutionalKnowledge(knowledgeInput.trim());
+        setKnowledgeSearchItems(response.items);
+        setKnowledgeAnswer(null);
+      } else {
+        setKnowledgeAnswer(await answerFromInstitutionalKnowledge(knowledgeInput.trim()));
+        setKnowledgeSearchItems([]);
+      }
+    } catch (error) {
+      setKnowledgeError(
+        smartBarError(error, 'تعذر الوصول إلى المعرفة. بقي السؤال محفوظًا لإعادة المحاولة.'),
+      );
+    } finally {
+      setKnowledgeBusy(false);
+    }
+  };
+
   return (
     <div className="ex-smartbar-layer" role="presentation" onMouseDown={onClose}>
       <section
-        className="ex-smartbar"
+        className="ex-smartbar ex-smartbar-expanded"
         role="dialog"
         aria-modal="true"
         aria-labelledby="executive-smartbar-title"
@@ -375,52 +888,178 @@ export function ExecutiveSmartBar({ open, onClose }: { open: boolean; onClose():
         <div className="ex-smartbar-heading">
           <div>
             <h2 id="executive-smartbar-title">شريط الانتقال التنفيذي</h2>
-            <p>ينقلك إلى الصفحات المصرح بها فقط، ولا ينفذ أي إجراء أو تغيير.</p>
+            <span className="ex-smartbar-title-badge">ذكي ومحكوم بالصلاحيات</span>
+            <p>تنقل واستعلام ومعرفة وكتابة وفق صلاحياتك؛ لا ينفذ أي تغيير مباشر.</p>
           </div>
           <button className="ex-icon-button" type="button" onClick={onClose} aria-label="إغلاق">
             ×
           </button>
         </div>
-        <label className="ex-smartbar-search">
-          <span className="sr-only">ابحث عن صفحة أو أداة</span>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={handleInputKeyDown}
-            placeholder="ابحث عن صفحة أو أداة…"
-            aria-controls="executive-smartbar-results"
-            aria-activedescendant={
-              results[activeIndex] ? `executive-smartbar-option-${activeIndex}` : undefined
-            }
-          />
-          <kbd>Esc</kbd>
-        </label>
-        <div id="executive-smartbar-results" className="ex-smartbar-results" role="listbox">
-          {results.map((item, index) => (
-            <button
-              id={`executive-smartbar-option-${index}`}
-              key={item.to}
-              type="button"
-              role="option"
-              aria-selected={index === activeIndex}
-              className={index === activeIndex ? 'is-active' : ''}
-              onMouseEnter={() => setActiveIndex(index)}
-              onClick={() => choose(item)}
-            >
-              <span>
-                <strong>{item.label}</strong>
-                <small>{item.description}</small>
-              </span>
-              <span aria-hidden="true">←</span>
-            </button>
-          ))}
-          {results.length === 0 && (
-            <ExecutiveEmptyState
-              title="لا توجد وجهة مطابقة"
-              description="جرّب اسم صفحة أخرى ضمن نطاق صلاحياتك."
-              compact
-            />
+        <SmartBarModeSelector modes={availableModes} value={mode} onChange={setMode} />
+        <div className="ex-smartbar-workspace">
+          {mode === 'navigation' && (
+            <>
+              <label className="ex-smartbar-search">
+                <span className="sr-only">ابحث عن صفحة أو أداة</span>
+                <input
+                  ref={navigationInputRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                  placeholder="ابحث عن صفحة أو أداة…"
+                  aria-controls="executive-smartbar-results"
+                  aria-activedescendant={
+                    results[activeIndex] ? `executive-smartbar-option-${activeIndex}` : undefined
+                  }
+                />
+                <kbd>Esc</kbd>
+              </label>
+              <div id="executive-smartbar-results" className="ex-smartbar-results" role="listbox">
+                {results.map((item, index) => (
+                  <button
+                    id={`executive-smartbar-option-${index}`}
+                    key={item.to}
+                    type="button"
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    className={index === activeIndex ? 'is-active' : ''}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => choose(item)}
+                  >
+                    <span>
+                      <strong>{item.label}</strong>
+                      <small>{item.description}</small>
+                    </span>
+                    <span aria-hidden="true">←</span>
+                  </button>
+                ))}
+                {results.length === 0 && (
+                  <ExecutiveEmptyState
+                    title="لا توجد وجهة مطابقة"
+                    description="جرّب اسم صفحة أخرى ضمن نطاق صلاحياتك."
+                    compact
+                  />
+                )}
+              </div>
+            </>
+          )}
+
+          {mode === 'structured' && (
+            <div className="ex-smartbar-tool">
+              <form onSubmit={(event) => void submitStructured(event)}>
+                <label>
+                  <span>سؤال عن البيانات المؤسسية المنظمة</span>
+                  <input
+                    ref={modeInputRef}
+                    value={structuredInput}
+                    onChange={(event) => setStructuredInput(event.target.value)}
+                    minLength={3}
+                    maxLength={500}
+                    required
+                    placeholder="مثال: ما المبادرات المتأخرة؟"
+                  />
+                </label>
+                <button type="submit" disabled={structuredBusy}>
+                  {structuredBusy ? 'جارٍ الاستعلام…' : 'تنفيذ الاستعلام'}
+                </button>
+                <small>يدعم النطاقات المنظمة المتاحة فقط، ولا يصل إلى قاعدة البيانات مباشرة.</small>
+              </form>
+              {structuredError && (
+                <div className="ex-smartbar-error" role="alert">
+                  {structuredError}
+                </div>
+              )}
+              {structuredResult && structuredReceivedAt && (
+                <StructuredQueryResult
+                  result={structuredResult}
+                  receivedAt={structuredReceivedAt}
+                  can={can}
+                />
+              )}
+            </div>
+          )}
+
+          {mode === 'knowledge' && (
+            <div className="ex-smartbar-tool">
+              <div
+                className="ex-knowledge-action-selector"
+                role="group"
+                aria-label="نوع طلب المعرفة"
+              >
+                {can('knowledge.search') && (
+                  <button
+                    type="button"
+                    aria-pressed={knowledgeAction === 'search'}
+                    className={knowledgeAction === 'search' ? 'is-active' : ''}
+                    onClick={() => setKnowledgeAction('search')}
+                  >
+                    بحث في الأدلة
+                  </button>
+                )}
+                {can('knowledge.ask') && (
+                  <button
+                    type="button"
+                    aria-pressed={knowledgeAction === 'answer'}
+                    className={knowledgeAction === 'answer' ? 'is-active' : ''}
+                    onClick={() => setKnowledgeAction('answer')}
+                  >
+                    إجابة مستندة إلى الأدلة
+                  </button>
+                )}
+              </div>
+              <form onSubmit={(event) => void submitKnowledge(event)}>
+                <label>
+                  <span>موضوع البحث أو السؤال</span>
+                  <input
+                    ref={modeInputRef}
+                    value={knowledgeInput}
+                    onChange={(event) => setKnowledgeInput(event.target.value)}
+                    minLength={2}
+                    maxLength={600}
+                    required
+                  />
+                </label>
+                <button type="submit" disabled={knowledgeBusy}>
+                  {knowledgeBusy
+                    ? 'جارٍ استرجاع الأدلة…'
+                    : knowledgeAction === 'search'
+                      ? 'البحث'
+                      : 'إنشاء الإجابة'}
+                </button>
+                <small>لا يبدأ أي بحث تلقائيًا، وتظل الاقتباسات والمصادر منفصلة.</small>
+              </form>
+              {knowledgeError && (
+                <div className="ex-smartbar-error" role="alert">
+                  {knowledgeError}
+                </div>
+              )}
+              <KnowledgeAnswerResult answer={knowledgeAnswer} searchItems={knowledgeSearchItems} />
+            </div>
+          )}
+
+          {mode === 'writing' && (
+            <div className="ex-smartbar-tool">
+              {capabilityBusy && (
+                <div className="ex-card-loading" aria-label="جارٍ تحميل صيغ الكتابة">
+                  <span />
+                  <span />
+                </div>
+              )}
+              {capabilityError && (
+                <div className="ex-smartbar-error" role="alert">
+                  {capabilityError}
+                </div>
+              )}
+              {capabilities && (
+                <>
+                  <div className="ex-writing-capability-note">
+                    <strong>Enterprise {capabilities.version}</strong>
+                    <span>إعادة صياغة مهنية، والمراجع منفصلة، ولا نسخ مباشر للفقرات.</span>
+                  </div>
+                  <ExecutiveWritingForm definitions={writingDefinitions} />
+                </>
+              )}
+            </div>
           )}
         </div>
       </section>
@@ -434,8 +1073,8 @@ export function MobileBottomNavigation() {
     navigationItems.find((item) => item.to === '/'),
     navigationItems.find((item) => item.to === '/executive/command-center'),
     navigationItems.find((item) => item.to === '/executive/today'),
+    navigationItems.find((item) => item.to === '/executive/leadership'),
     navigationItems.find((item) => item.to === '/executive-assistant'),
-    navigationItems.find((item) => item.to === '/account'),
   ].filter((item): item is NavigationItem => Boolean(item));
   const items = candidates.filter((item) => allowed(item, can)).slice(0, 5);
 
@@ -450,9 +1089,9 @@ export function MobileBottomNavigation() {
                 ? '◎'
                 : item.to === '/executive/today'
                   ? '◷'
-                  : item.to === '/executive-assistant'
-                    ? '✦'
-                    : '●'}
+                  : item.to === '/executive/leadership'
+                    ? '◈'
+                    : '✦'}
           </span>
           <small>{item.label.replace('الرئيسية التنفيذية', 'الرئيسية')}</small>
         </NavLink>
@@ -462,25 +1101,38 @@ export function MobileBottomNavigation() {
 }
 
 export function ExecutiveLayout({ children }: { children: ReactNode }) {
+  const { can } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [smartBarOpen, setSmartBarOpen] = useState(false);
+  const smartBarAvailable =
+    navigationItems.some((item) => item.permission && can(item.permission)) ||
+    can('executive.query') ||
+    can('knowledge.search') ||
+    can('knowledge.ask') ||
+    can('executive_ai.use');
 
   useEffect(() => {
-    const openSmartBar = () => setSmartBarOpen(true);
+    if (!smartBarAvailable) setSmartBarOpen(false);
+  }, [smartBarAvailable]);
+
+  useEffect(() => {
+    const openSmartBar = () => {
+      if (smartBarAvailable) setSmartBarOpen(true);
+    };
     window.addEventListener('executive-smartbar-open', openSmartBar);
     return () => window.removeEventListener('executive-smartbar-open', openSmartBar);
-  }, []);
+  }, [smartBarAvailable]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
         event.preventDefault();
-        setSmartBarOpen(true);
+        if (smartBarAvailable) setSmartBarOpen(true);
       }
     };
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, []);
+  }, [smartBarAvailable]);
 
   return (
     <div className="ex-shell" dir="rtl">
@@ -489,22 +1141,27 @@ export function ExecutiveLayout({ children }: { children: ReactNode }) {
         <ExecutiveHeader
           onOpenSidebar={() => setSidebarOpen(true)}
           onOpenSmartBar={() => setSmartBarOpen(true)}
+          smartBarAvailable={smartBarAvailable}
         />
-        <div className="ex-smartbar-dock">
-          <button
-            type="button"
-            onClick={() => setSmartBarOpen(true)}
-            aria-label="فتح شريط الانتقال التنفيذي"
-          >
-            <span aria-hidden="true">⌕</span>
-            <span>انتقل إلى صفحة أو أداة ضمن صلاحياتك</span>
-            <kbd>⌘ / Ctrl + K</kbd>
-          </button>
-        </div>
+        {smartBarAvailable && (
+          <div className="ex-smartbar-dock">
+            <button
+              type="button"
+              onClick={() => setSmartBarOpen(true)}
+              aria-label="فتح الشريط التنفيذي الذكي"
+            >
+              <span aria-hidden="true">⌕</span>
+              <span>تنقل، استعلم، وابحث أو اكتب ضمن صلاحياتك</span>
+              <kbd>⌘ / Ctrl + K</kbd>
+            </button>
+          </div>
+        )}
         <main className="ex-content">{children}</main>
       </div>
       <MobileBottomNavigation />
-      <ExecutiveSmartBar open={smartBarOpen} onClose={() => setSmartBarOpen(false)} />
+      {smartBarAvailable && (
+        <ExecutiveSmartBar open={smartBarOpen} onClose={() => setSmartBarOpen(false)} />
+      )}
     </div>
   );
 }
